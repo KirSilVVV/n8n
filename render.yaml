@@ -42,7 +42,6 @@ services:
           property: password
       - key: DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED
         value: "false"
-    port: 5678
 
 databases:
   - name: n8n-db
