@@ -1,0 +1,628 @@
+{
+  "updatedAt": "2026-03-05T11:40:09.387Z",
+  "createdAt": "2026-02-28T00:24:07.424Z",
+  "id": "lpRlcddSkLxcLVwb",
+  "name": "[BOT] GG Telegram v2",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Telegram Trigger",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        100,
+        400
+      ],
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      },
+      "webhookId": "f3fa0ae2-7eaa-4631-ae3c-e20b3e8e878f"
+    },
+    {
+      "id": "n2",
+      "name": "Parse",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        400
+      ],
+      "parameters": {
+        "jsCode": "const m=$input.first().json;const t=(m.message?.text||'').trim();const c=String(m.message?.chat?.id||'');const u=m.message?.from?.first_name||'Friend';const l=t.toLowerCase();let cmd='help';if(l.startsWith('/stats'))cmd='stats';else if(l.startsWith('/today'))cmd='today';else if(l.startsWith('/stuck'))cmd='stuck';else if(l.startsWith('/top'))cmd='top';else if(l.startsWith('/brief')||l.startsWith('/ask'))cmd='ai';return[{json:{cmd,chatId:c,username:u,text:t}}];"
+      }
+    },
+    {
+      "id": "n3",
+      "name": "DB",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        500,
+        400
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT (SELECT COUNT(*) FROM marketplace_order WHERE status IN ('completed','completed_with_review') AND created_at>NOW()-INTERVAL '24h')::int as d24,(SELECT ROUND(SUM((content->>'total')::numeric/100) FILTER (WHERE status IN ('completed','completed_with_review') AND created_at>NOW()-INTERVAL '24h'),2) FROM marketplace_order) as e24,(SELECT COUNT(*) FROM marketplace_order WHERE status='paid')::int as paid,(SELECT COUNT(*) FROM marketplace_order WHERE status='in_progress')::int as inp,(SELECT COUNT(*) FROM marketplace_order WHERE status IN ('paid','in_progress') AND updated_at<NOW()-INTERVAL '2h')::int as stuck,(SELECT ROUND(SUM((content->>'total')::numeric/100) FILTER (WHERE status IN ('completed','completed_with_review') AND created_at>NOW()-INTERVAL '30 days'),2) FROM marketplace_order) as e30,(SELECT COUNT(*) FILTER (WHERE hidden=false AND moderated=true AND quantity>0) FROM marketplace)::int as act",
+        "options": {}
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "id": "n4",
+      "name": "Is AI?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        700,
+        400
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.cmd }}",
+              "rightValue": "ai",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "n5",
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ],
+      "parameters": {
+        "jsCode": "const db=$('DB').first().json;const{cmd,chatId,username}=$('Parse').first().json;let msg='';if(cmd==='stats'){msg='GG Exchange stats\\n24h orders: '+db.d24+' / EUR '+db.e24+'\\nPaid: '+db.paid+' | In progress: '+db.inp+'\\nStuck >2h: '+db.stuck+'\\n30d revenue: EUR '+db.e30+'\\nActive listings: '+db.act;}else if(cmd==='today'){msg='Today '+new Date().toLocaleDateString('ru-RU')+'\\nOrders: '+db.d24+'\\nRevenue: EUR '+db.e24+'\\nAwaiting payment: '+db.paid;}else if(cmd==='stuck'){msg=db.stuck>0?'Stuck orders: '+db.stuck+'. Check paid/in_progress over 2h':'No stuck orders!';}else if(cmd==='top'){msg='30d: EUR '+db.e30+' revenue | '+db.act+' active listings';}else{msg='Hello '+username+'! Commands: /stats /today /stuck /top /brief /ask';}return[{json:{chatId,msg}}];"
+      }
+    },
+    {
+      "id": "n6",
+      "name": "AI Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        520
+      ],
+      "parameters": {
+        "jsCode": "const db=$('DB').first().json;const{chatId,text}=$('Parse').first().json;const q=text.replace('/brief','').replace('/ask','').trim();const ctx='GG Exchange: orders_24h='+db.d24+' eur_24h='+db.e24+' stuck='+db.stuck+' eur_30d='+db.e30+' active='+db.act;const prompt=ctx+(q?' Investor asks: '+q+'. Answer in Russian briefly.':' Brief in Russian: 3 sentences on facts, problems, actions.');return[{json:{chatId,prompt}}];"
+      }
+    },
+    {
+      "id": "n7",
+      "name": "Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        520
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $credentials.httpHeaderAuth.value }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({model:'claude-haiku-4-5',max_tokens:400,messages:[{role:'user',content:$json.prompt}]}) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "xZPzwI0sOTN0iSp8",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "id": "n8",
+      "name": "Format AI",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        520
+      ],
+      "parameters": {
+        "jsCode": "const r=$input.first().json;const c=$('Parse').first().json.chatId;const t=r?.content?.[0]?.text||'No response';return[{json:{chatId:c,msg:'AI: '+t}}];"
+      }
+    },
+    {
+      "id": "n9",
+      "name": "Send",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1480,
+        400
+      ],
+      "parameters": {
+        "chatId": "={{ $json.chatId }}",
+        "text": "={{ $json.msg }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Telegram Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse": {
+      "main": [
+        [
+          {
+            "node": "DB",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB": {
+      "main": [
+        [
+          {
+            "node": "Is AI?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is AI?": {
+      "main": [
+        [
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "AI Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format": {
+      "main": [
+        [
+          {
+            "node": "Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Prompt": {
+      "main": [
+        [
+          {
+            "node": "Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude": {
+      "main": [
+        [
+          {
+            "node": "Format AI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format AI": {
+      "main": [
+        [
+          {
+            "node": "Send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "timeSavedMode": "fixed",
+    "binaryMode": "separate"
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "e4b1e190-7183-4051-a7fc-adef82cad63f",
+  "activeVersionId": "e4b1e190-7183-4051-a7fc-adef82cad63f",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-02-28T00:24:07.424Z",
+      "createdAt": "2026-02-28T00:24:07.424Z",
+      "role": "workflow:owner",
+      "workflowId": "lpRlcddSkLxcLVwb",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-05T11:37:27.929Z",
+    "createdAt": "2026-03-05T11:16:17.931Z",
+    "versionId": "e4b1e190-7183-4051-a7fc-adef82cad63f",
+    "workflowId": "lpRlcddSkLxcLVwb",
+    "nodes": [
+      {
+        "id": "n1",
+        "name": "Telegram Trigger",
+        "type": "n8n-nodes-base.telegramTrigger",
+        "typeVersion": 1.1,
+        "position": [
+          100,
+          400
+        ],
+        "parameters": {
+          "updates": [
+            "message"
+          ],
+          "additionalFields": {}
+        },
+        "credentials": {
+          "telegramApi": {
+            "id": "IjoBfA5jgnMrU9qV",
+            "name": "GG Telegram Bot"
+          }
+        },
+        "webhookId": "f3fa0ae2-7eaa-4631-ae3c-e20b3e8e878f"
+      },
+      {
+        "id": "n2",
+        "name": "Parse",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          300,
+          400
+        ],
+        "parameters": {
+          "jsCode": "const m=$input.first().json;const t=(m.message?.text||'').trim();const c=String(m.message?.chat?.id||'');const u=m.message?.from?.first_name||'Friend';const l=t.toLowerCase();let cmd='help';if(l.startsWith('/stats'))cmd='stats';else if(l.startsWith('/today'))cmd='today';else if(l.startsWith('/stuck'))cmd='stuck';else if(l.startsWith('/top'))cmd='top';else if(l.startsWith('/brief')||l.startsWith('/ask'))cmd='ai';return[{json:{cmd,chatId:c,username:u,text:t}}];"
+        }
+      },
+      {
+        "id": "n3",
+        "name": "DB",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          500,
+          400
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT (SELECT COUNT(*) FROM marketplace_order WHERE status IN ('completed','completed_with_review') AND created_at>NOW()-INTERVAL '24h')::int as d24,(SELECT ROUND(SUM((content->>'total')::numeric/100) FILTER (WHERE status IN ('completed','completed_with_review') AND created_at>NOW()-INTERVAL '24h'),2) FROM marketplace_order) as e24,(SELECT COUNT(*) FROM marketplace_order WHERE status='paid')::int as paid,(SELECT COUNT(*) FROM marketplace_order WHERE status='in_progress')::int as inp,(SELECT COUNT(*) FROM marketplace_order WHERE status IN ('paid','in_progress') AND updated_at<NOW()-INTERVAL '2h')::int as stuck,(SELECT ROUND(SUM((content->>'total')::numeric/100) FILTER (WHERE status IN ('completed','completed_with_review') AND created_at>NOW()-INTERVAL '30 days'),2) FROM marketplace_order) as e30,(SELECT COUNT(*) FILTER (WHERE hidden=false AND moderated=true AND quantity>0) FROM marketplace)::int as act",
+          "options": {}
+        },
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "id": "n4",
+        "name": "Is AI?",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 2.2,
+        "position": [
+          700,
+          400
+        ],
+        "parameters": {
+          "conditions": {
+            "options": {
+              "caseSensitive": false,
+              "leftValue": "",
+              "typeValidation": "strict",
+              "version": 2
+            },
+            "conditions": [
+              {
+                "id": "c1",
+                "leftValue": "={{ $json.cmd }}",
+                "rightValue": "ai",
+                "operator": {
+                  "type": "string",
+                  "operation": "equals"
+                }
+              }
+            ],
+            "combinator": "and"
+          }
+        }
+      },
+      {
+        "id": "n5",
+        "name": "Format",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          900,
+          300
+        ],
+        "parameters": {
+          "jsCode": "const db=$('DB').first().json;const{cmd,chatId,username}=$('Parse').first().json;let msg='';if(cmd==='stats'){msg='GG Exchange stats\\n24h orders: '+db.d24+' / EUR '+db.e24+'\\nPaid: '+db.paid+' | In progress: '+db.inp+'\\nStuck >2h: '+db.stuck+'\\n30d revenue: EUR '+db.e30+'\\nActive listings: '+db.act;}else if(cmd==='today'){msg='Today '+new Date().toLocaleDateString('ru-RU')+'\\nOrders: '+db.d24+'\\nRevenue: EUR '+db.e24+'\\nAwaiting payment: '+db.paid;}else if(cmd==='stuck'){msg=db.stuck>0?'Stuck orders: '+db.stuck+'. Check paid/in_progress over 2h':'No stuck orders!';}else if(cmd==='top'){msg='30d: EUR '+db.e30+' revenue | '+db.act+' active listings';}else{msg='Hello '+username+'! Commands: /stats /today /stuck /top /brief /ask';}return[{json:{chatId,msg}}];"
+        }
+      },
+      {
+        "id": "n6",
+        "name": "AI Prompt",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          900,
+          520
+        ],
+        "parameters": {
+          "jsCode": "const db=$('DB').first().json;const{chatId,text}=$('Parse').first().json;const q=text.replace('/brief','').replace('/ask','').trim();const ctx='GG Exchange: orders_24h='+db.d24+' eur_24h='+db.e24+' stuck='+db.stuck+' eur_30d='+db.e30+' active='+db.act;const prompt=ctx+(q?' Investor asks: '+q+'. Answer in Russian briefly.':' Brief in Russian: 3 sentences on facts, problems, actions.');return[{json:{chatId,prompt}}];"
+        }
+      },
+      {
+        "id": "n7",
+        "name": "Claude",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1100,
+          520
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.anthropic.com/v1/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-api-key",
+                "value": "={{ $credentials.httpHeaderAuth.value }}"
+              },
+              {
+                "name": "anthropic-version",
+                "value": "2023-06-01"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "application/json",
+          "body": "={{ JSON.stringify({model:'claude-haiku-4-5',max_tokens:400,messages:[{role:'user',content:$json.prompt}]}) }}",
+          "options": {
+            "timeout": 30000,
+            "response": {
+              "response": {
+                "responseFormat": "json"
+              }
+            }
+          }
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "xZPzwI0sOTN0iSp8",
+            "name": "Anthropic API"
+          }
+        }
+      },
+      {
+        "id": "n8",
+        "name": "Format AI",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1300,
+          520
+        ],
+        "parameters": {
+          "jsCode": "const r=$input.first().json;const c=$('Parse').first().json.chatId;const t=r?.content?.[0]?.text||'No response';return[{json:{chatId:c,msg:'AI: '+t}}];"
+        }
+      },
+      {
+        "id": "n9",
+        "name": "Send",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1480,
+          400
+        ],
+        "parameters": {
+          "chatId": "={{ $json.chatId }}",
+          "text": "={{ $json.msg }}",
+          "additionalFields": {}
+        },
+        "credentials": {
+          "telegramApi": {
+            "id": "IjoBfA5jgnMrU9qV",
+            "name": "GG Telegram Bot"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Telegram Trigger": {
+        "main": [
+          [
+            {
+              "node": "Parse",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Parse": {
+        "main": [
+          [
+            {
+              "node": "DB",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "DB": {
+        "main": [
+          [
+            {
+              "node": "Is AI?",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Is AI?": {
+        "main": [
+          [
+            {
+              "node": "Format",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "AI Prompt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format": {
+        "main": [
+          [
+            {
+              "node": "Send",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "AI Prompt": {
+        "main": [
+          [
+            {
+              "node": "Claude",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claude": {
+        "main": [
+          [
+            {
+              "node": "Format AI",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Format AI": {
+        "main": [
+          [
+            {
+              "node": "Send",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": "Version e4b1e190",
+    "description": "",
+    "autosaved": false
+  },
+  "tags": []
+}
