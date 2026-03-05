@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T14:31:16.478Z",
+  "createdAt": "2026-03-01T14:31:16.478Z",
+  "id": "XkNFeap5YOPivyIQ",
+  "name": "[R] Q2b keys",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "research-q2b-keys",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "research-q2b-keys"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT key, COUNT(*) as cnt\nFROM marketplace_order, jsonb_object_keys(order_data) as key\nWHERE created_at > NOW() - INTERVAL '30 days'\nGROUP BY key ORDER BY cnt DESC LIMIT 20\n",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "Query",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "070058e6-e5b6-4df8-a096-4839ec3926c4",
+  "activeVersionId": "070058e6-e5b6-4df8-a096-4839ec3926c4",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:31:16.478Z",
+      "createdAt": "2026-03-01T14:31:16.478Z",
+      "role": "workflow:owner",
+      "workflowId": "XkNFeap5YOPivyIQ",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T14:31:16.537Z",
+    "createdAt": "2026-03-01T14:31:16.537Z",
+    "versionId": "070058e6-e5b6-4df8-a096-4839ec3926c4",
+    "workflowId": "XkNFeap5YOPivyIQ",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "research-q2b-keys",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "wh1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "research-q2b-keys"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "\nSELECT key, COUNT(*) as cnt\nFROM marketplace_order, jsonb_object_keys(order_data) as key\nWHERE created_at > NOW() - INTERVAL '30 days'\nGROUP BY key ORDER BY cnt DESC LIMIT 20\n",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "Query",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          480,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Query",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
