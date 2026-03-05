@@ -1,0 +1,70 @@
+{
+  "updatedAt": "2026-03-01T14:25:12.627Z",
+  "createdAt": "2026-03-01T14:25:12.627Z",
+  "id": "deROt1CXJkTItREi",
+  "name": "[RESEARCH] Order Segmentation Queries",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "trig",
+      "name": "Manual",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst { Client } = require('pg');\nconst client = new Client({\n  host: '65.108.106.66', port: 5432,\n  database: 'jwwfplhm', user: 'claude_dima',\n  password: 'aehTeagh683jfkhhqg926grtj55',\n  connectionTimeoutMillis: 15000, ssl: false\n});\nawait client.connect();\n\n// Q1: Nutaku brand names\nconst q1 = await client.query(`\n  SELECT DISTINCT brand, COUNT(*) as cnt\n  FROM marketplace\n  WHERE LOWER(brand) LIKE '%nutaku%'\n     OR LOWER(title) LIKE '%nutaku%'\n  GROUP BY brand ORDER BY cnt DESC LIMIT 10\n`);\n\n// Q2: How are YM orders marked - check external_order_id and order_data\nconst q2 = await client.query(`\n  SELECT \n    external_order_id,\n    order_data->>'source' as source,\n    order_data->>'channel' as channel,\n    order_data->>'payment_method' as payment_method,\n    COUNT(*) as cnt\n  FROM marketplace_order\n  WHERE created_at > NOW() - INTERVAL '30 days'\n    AND external_order_id IS NOT NULL\n  GROUP BY 1,2,3,4\n  ORDER BY cnt DESC LIMIT 20\n`);\n\n// Q3: How marketplace_order links to marketplace (product)\nconst q3 = await client.query(`\n  SELECT \n    order_data->>'productId' as from_productId,\n    (content->'items'->0->>'id') as from_content_items_id,\n    (content->'items'->0->>'title') as item_title,\n    (content->'items'->0->>'brand') as item_brand,\n    COUNT(*) as cnt\n  FROM marketplace_order\n  WHERE created_at > NOW() - INTERVAL '7 days'\n    AND status IN ('completed','completed_with_review')\n  GROUP BY 1,2,3,4\n  ORDER BY cnt DESC LIMIT 10\n`);\n\n// Q4: Sample completed orders to see full structure\nconst q4 = await client.query(`\n  SELECT \n    id, external_order_id,\n    order_data::text as od_sample,\n    content::text as content_sample\n  FROM marketplace_order\n  WHERE status IN ('completed','completed_with_review')\n    AND created_at > NOW() - INTERVAL '7 days'\n  LIMIT 3\n`);\n\nawait client.end();\n\nreturn [{json: {\n  q1_nutaku_brands: q1.rows,\n  q2_ym_markers: q2.rows,\n  q3_order_product_link: q3.rows,\n  q4_sample_orders: q4.rows.map(r => ({\n    id: r.id,\n    external_order_id: r.external_order_id,\n    od_sample: r.od_sample?.substring(0,300),\n    content_sample: r.content_sample?.substring(0,300)\n  }))\n}}];\n",
+        "mode": "runOnceForAllItems"
+      },
+      "id": "code1",
+      "name": "Research Queries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Manual": {
+      "main": [
+        [
+          {
+            "node": "Research Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "32f6ee9a-4b3c-438e-b0b5-d43f065493d1",
+  "activeVersionId": null,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:25:12.627Z",
+      "createdAt": "2026-03-01T14:25:12.627Z",
+      "role": "workflow:owner",
+      "workflowId": "deROt1CXJkTItREi",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": null,
+  "tags": []
+}
