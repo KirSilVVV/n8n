@@ -1,0 +1,62 @@
+{
+  "updatedAt": "2026-02-28T00:21:04.630Z",
+  "createdAt": "2026-02-27T21:36:53.349Z",
+  "id": "mejE2tKOk02IXr9w",
+  "name": "My workflow",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aa5ef237-8e25-4246-8a14-5f701d21eeb0",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "ccece4a7-1a44-451f-8930-b12e2e2b6e3b",
+      "name": "Webhook",
+      "webhookId": "aa5ef237-8e25-4246-8a14-5f701d21eeb0"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        144,
+        144
+      ],
+      "id": "785d93b0-6b7d-49f8-afac-6a435610daa8",
+      "name": "Read/Write Files from Disk"
+    }
+  ],
+  "connections": {},
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": {},
+  "versionId": "7082a981-80bb-4809-9f08-3dba4714a66a",
+  "activeVersionId": null,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-02-27T21:36:53.349Z",
+      "createdAt": "2026-02-27T21:36:53.349Z",
+      "role": "workflow:owner",
+      "workflowId": "mejE2tKOk02IXr9w",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": null,
+  "tags": []
+}
