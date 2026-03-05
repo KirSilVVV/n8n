@@ -1,0 +1,619 @@
+{
+  "updatedAt": "2026-03-05T10:50:20.827Z",
+  "createdAt": "2026-03-05T10:50:20.827Z",
+  "id": "jBTUv16jWd1Gqjvk",
+  "name": "WF-103: Product Agent (SHOP_FAILED Monitor)",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "id": "n1",
+      "name": "Schedule 07:00 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * *"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "n3",
+      "name": "PG: SHOP_FAILED Stats",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        500,
+        300
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "SELECT COUNT(*) AS total_ym, COUNT(*) FILTER (WHERE order_data->>'substatus' = 'SHOP_FAILED') AS shop_failed, COUNT(*) FILTER (WHERE status IN ('completed','completed_with_review')) AS success, ROUND(COUNT(*) FILTER (WHERE order_data->>'substatus' = 'SHOP_FAILED')::numeric / NULLIF(COUNT(*),0) * 100, 1) AS fail_pct FROM marketplace_order WHERE order_data->>'source' = 'yandex_market' AND created_at > NOW() - INTERVAL '24 hours'"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "id": "n4",
+      "name": "PG: Revenue Today",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        500,
+        460
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "WITH rate AS (SELECT rate FROM currency WHERE code = 'RUB' LIMIT 1) SELECT COUNT(*) FILTER (WHERE DATE(mo.created_at) = CURRENT_DATE AND mo.status IN ('completed','completed_with_review')) AS orders_today, ROUND(SUM((mo.content->>'total')::numeric/100) FILTER (WHERE DATE(mo.created_at) = CURRENT_DATE AND mo.status IN ('completed','completed_with_review')), 2) AS eur_today, ROUND(SUM((mo.content->>'total')::numeric/100) FILTER (WHERE mo.created_at > NOW() - INTERVAL '30 days' AND mo.status IN ('completed','completed_with_review')), 2) AS eur_30d, ROUND(SUM((mo.content->>'total')::numeric/100 * r.rate) FILTER (WHERE DATE(mo.created_at) = CURRENT_DATE AND mo.status IN ('completed','completed_with_review')), 0) AS rub_today FROM marketplace_order mo CROSS JOIN rate r"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "id": "n5",
+      "name": "PG: Catalog Health",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        500,
+        620
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "SELECT COUNT(*) FILTER (WHERE hidden=false AND moderated=true AND quantity>0) AS active, COUNT(*) FILTER (WHERE quantity=0 AND hidden=false AND moderated=true) AS oos_visible, COUNT(*) FILTER (WHERE moderated=false AND hidden=false) AS pending_mod FROM marketplace"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "id": "n6",
+      "name": "PG: SHOP_FAILED Details",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        500,
+        780
+      ],
+      "parameters": {
+        "operation": "executeQuery",
+        "options": {},
+        "query": "SELECT external_order_id, content->'items'->0->>'title' AS product FROM marketplace_order WHERE order_data->>'substatus' = 'SHOP_FAILED' AND created_at > NOW() - INTERVAL '24 hours' ORDER BY created_at DESC LIMIT 5"
+      },
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "id": "n7",
+      "name": "Code: Build Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        540
+      ],
+      "parameters": {
+        "jsCode": "const sf = $('PG: SHOP_FAILED Stats').first().json;\nconst rev = $('PG: Revenue Today').first().json;\nconst cat = $('PG: Catalog Health').first().json;\nconst details = $('PG: SHOP_FAILED Details').all().map(i=>i.json);\nconst failPct = parseFloat(sf.fail_pct||0);\nconst anomalies = [];\nif (failPct > 30) anomalies.push('SHOP_FAILED ' + failPct + '% КРИТИЧНО');\nelse if (failPct > 10) anomalies.push('SHOP_FAILED ' + failPct + '% выше нормы');\nif (parseInt(cat.oos_visible||0) > 10000) anomalies.push('OOS видны: ' + cat.oos_visible);\nif (parseInt(cat.pending_mod||0) > 2000) anomalies.push('Модерация: ' + cat.pending_mod);\nconst today = new Date().toISOString().slice(0,10);\nconst failList = details.slice(0,3).map(d => '- ' + (d.product||d.external_order_id||'?')).join('; ');\nconst prompt = 'Head of Product GG Exchange. Утренний брифинг инвестору. Данные ' + today + ': YM заказы 24ч: всего ' + sf.total_ym + ', SHOP_FAILED ' + sf.shop_failed + ' (' + sf.fail_pct + '%), успешных ' + sf.success + '. Выручка сегодня EUR ' + (rev.eur_today||0) + ' RUB ' + (rev.rub_today||0) + '. 30 дней EUR ' + (rev.eur_30d||0) + '. Каталог: активных ' + cat.active + ', OOS ' + cat.oos_visible + ', модерация ' + cat.pending_mod + '. ' + (failList ? 'SHOP_FAILED товары: ' + failList + '. ' : '') + (anomalies.length ? 'Аномалии: ' + anomalies.join(', ') + '.' : 'Аномалий нет.') + ' Формат: 3-4 предложения. Числа потом проблема потом действие. Без вводных слов.';\nreturn [{ json: { prompt, sf, rev, cat, anomalies, failPct } }];"
+      }
+    },
+    {
+      "id": "n8",
+      "name": "Claude: Analyze",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1020,
+        540
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-api-key",
+              "value": "={{ $credentials.httpHeaderAuth.value }}"
+            },
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({model:'claude-haiku-4-5',max_tokens:500,messages:[{role:'user',content:$json.prompt}]}) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "xZPzwI0sOTN0iSp8",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "id": "n9",
+      "name": "Code: Format Telegram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        540
+      ],
+      "parameters": {
+        "jsCode": "const ctx = $('Code: Build Context').first().json;\nconst resp = $('Claude: Analyze').first().json;\nconst analysis = (resp && resp.content && resp.content[0]) ? resp.content[0].text : 'Анализ недоступен';\nconst icon = ctx.failPct > 30 ? '🚨' : ctx.anomalies.length > 0 ? '⚠️' : '✅';\nconst date = new Date().toLocaleDateString('ru-RU');\nconst msg = icon + ' GG Exchange ' + date + ' ' + ctx.sf.fail_pct + '% SHOP_FAILED ' + ctx.sf.shop_failed + '/' + ctx.sf.total_ym + ' YM | EUR ' + (ctx.rev.eur_today||0) + ' сегодня | EUR ' + (ctx.rev.eur_30d||0) + ' 30д | каталог ' + ctx.cat.active + ' 🤖 ' + analysis;\nreturn [{ json: { msg } }];"
+      }
+    },
+    {
+      "id": "n10",
+      "name": "Telegram: Send Brief",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1540,
+        540
+      ],
+      "parameters": {
+        "chatId": "83436260",
+        "text": "={{ $json.msg }}",
+        "additionalFields": {}
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Schedule 07:00 UTC": {
+      "main": [
+        [
+          {
+            "node": "PG: SHOP_FAILED Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG: SHOP_FAILED Stats": {
+      "main": [
+        [
+          {
+            "node": "PG: Revenue Today",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG: Revenue Today": {
+      "main": [
+        [
+          {
+            "node": "PG: Catalog Health",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG: Catalog Health": {
+      "main": [
+        [
+          {
+            "node": "PG: SHOP_FAILED Details",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG: SHOP_FAILED Details": {
+      "main": [
+        [
+          {
+            "node": "Code: Build Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Build Context": {
+      "main": [
+        [
+          {
+            "node": "Claude: Analyze",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Claude: Analyze": {
+      "main": [
+        [
+          {
+            "node": "Code: Format Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Format Telegram": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Send Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Schedule 07:00 UTC": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "4cf41892-6ae2-4f7a-9df2-62763f69b04b",
+  "activeVersionId": "4cf41892-6ae2-4f7a-9df2-62763f69b04b",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-05T10:50:20.827Z",
+      "createdAt": "2026-03-05T10:50:20.827Z",
+      "role": "workflow:owner",
+      "workflowId": "jBTUv16jWd1Gqjvk",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-05T10:50:20.840Z",
+    "createdAt": "2026-03-05T10:50:20.840Z",
+    "versionId": "4cf41892-6ae2-4f7a-9df2-62763f69b04b",
+    "workflowId": "jBTUv16jWd1Gqjvk",
+    "nodes": [
+      {
+        "id": "n1",
+        "name": "Schedule 07:00 UTC",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          240,
+          300
+        ],
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 7 * * *"
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "n3",
+        "name": "PG: SHOP_FAILED Stats",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          500,
+          300
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "options": {},
+          "query": "SELECT COUNT(*) AS total_ym, COUNT(*) FILTER (WHERE order_data->>'substatus' = 'SHOP_FAILED') AS shop_failed, COUNT(*) FILTER (WHERE status IN ('completed','completed_with_review')) AS success, ROUND(COUNT(*) FILTER (WHERE order_data->>'substatus' = 'SHOP_FAILED')::numeric / NULLIF(COUNT(*),0) * 100, 1) AS fail_pct FROM marketplace_order WHERE order_data->>'source' = 'yandex_market' AND created_at > NOW() - INTERVAL '24 hours'"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "id": "n4",
+        "name": "PG: Revenue Today",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          500,
+          460
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "options": {},
+          "query": "WITH rate AS (SELECT rate FROM currency WHERE code = 'RUB' LIMIT 1) SELECT COUNT(*) FILTER (WHERE DATE(mo.created_at) = CURRENT_DATE AND mo.status IN ('completed','completed_with_review')) AS orders_today, ROUND(SUM((mo.content->>'total')::numeric/100) FILTER (WHERE DATE(mo.created_at) = CURRENT_DATE AND mo.status IN ('completed','completed_with_review')), 2) AS eur_today, ROUND(SUM((mo.content->>'total')::numeric/100) FILTER (WHERE mo.created_at > NOW() - INTERVAL '30 days' AND mo.status IN ('completed','completed_with_review')), 2) AS eur_30d, ROUND(SUM((mo.content->>'total')::numeric/100 * r.rate) FILTER (WHERE DATE(mo.created_at) = CURRENT_DATE AND mo.status IN ('completed','completed_with_review')), 0) AS rub_today FROM marketplace_order mo CROSS JOIN rate r"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "id": "n5",
+        "name": "PG: Catalog Health",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          500,
+          620
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "options": {},
+          "query": "SELECT COUNT(*) FILTER (WHERE hidden=false AND moderated=true AND quantity>0) AS active, COUNT(*) FILTER (WHERE quantity=0 AND hidden=false AND moderated=true) AS oos_visible, COUNT(*) FILTER (WHERE moderated=false AND hidden=false) AS pending_mod FROM marketplace"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "id": "n6",
+        "name": "PG: SHOP_FAILED Details",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          500,
+          780
+        ],
+        "parameters": {
+          "operation": "executeQuery",
+          "options": {},
+          "query": "SELECT external_order_id, content->'items'->0->>'title' AS product FROM marketplace_order WHERE order_data->>'substatus' = 'SHOP_FAILED' AND created_at > NOW() - INTERVAL '24 hours' ORDER BY created_at DESC LIMIT 5"
+        },
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "id": "n7",
+        "name": "Code: Build Context",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          760,
+          540
+        ],
+        "parameters": {
+          "jsCode": "const sf = $('PG: SHOP_FAILED Stats').first().json;\nconst rev = $('PG: Revenue Today').first().json;\nconst cat = $('PG: Catalog Health').first().json;\nconst details = $('PG: SHOP_FAILED Details').all().map(i=>i.json);\nconst failPct = parseFloat(sf.fail_pct||0);\nconst anomalies = [];\nif (failPct > 30) anomalies.push('SHOP_FAILED ' + failPct + '% КРИТИЧНО');\nelse if (failPct > 10) anomalies.push('SHOP_FAILED ' + failPct + '% выше нормы');\nif (parseInt(cat.oos_visible||0) > 10000) anomalies.push('OOS видны: ' + cat.oos_visible);\nif (parseInt(cat.pending_mod||0) > 2000) anomalies.push('Модерация: ' + cat.pending_mod);\nconst today = new Date().toISOString().slice(0,10);\nconst failList = details.slice(0,3).map(d => '- ' + (d.product||d.external_order_id||'?')).join('; ');\nconst prompt = 'Head of Product GG Exchange. Утренний брифинг инвестору. Данные ' + today + ': YM заказы 24ч: всего ' + sf.total_ym + ', SHOP_FAILED ' + sf.shop_failed + ' (' + sf.fail_pct + '%), успешных ' + sf.success + '. Выручка сегодня EUR ' + (rev.eur_today||0) + ' RUB ' + (rev.rub_today||0) + '. 30 дней EUR ' + (rev.eur_30d||0) + '. Каталог: активных ' + cat.active + ', OOS ' + cat.oos_visible + ', модерация ' + cat.pending_mod + '. ' + (failList ? 'SHOP_FAILED товары: ' + failList + '. ' : '') + (anomalies.length ? 'Аномалии: ' + anomalies.join(', ') + '.' : 'Аномалий нет.') + ' Формат: 3-4 предложения. Числа потом проблема потом действие. Без вводных слов.';\nreturn [{ json: { prompt, sf, rev, cat, anomalies, failPct } }];"
+        }
+      },
+      {
+        "id": "n8",
+        "name": "Claude: Analyze",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          1020,
+          540
+        ],
+        "parameters": {
+          "method": "POST",
+          "url": "https://api.anthropic.com/v1/messages",
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "x-api-key",
+                "value": "={{ $credentials.httpHeaderAuth.value }}"
+              },
+              {
+                "name": "anthropic-version",
+                "value": "2023-06-01"
+              }
+            ]
+          },
+          "sendBody": true,
+          "contentType": "raw",
+          "rawContentType": "application/json",
+          "body": "={{ JSON.stringify({model:'claude-haiku-4-5',max_tokens:500,messages:[{role:'user',content:$json.prompt}]}) }}",
+          "options": {
+            "timeout": 30000,
+            "response": {
+              "response": {
+                "responseFormat": "json"
+              }
+            }
+          }
+        },
+        "credentials": {
+          "httpHeaderAuth": {
+            "id": "xZPzwI0sOTN0iSp8",
+            "name": "Anthropic API"
+          }
+        }
+      },
+      {
+        "id": "n9",
+        "name": "Code: Format Telegram",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1280,
+          540
+        ],
+        "parameters": {
+          "jsCode": "const ctx = $('Code: Build Context').first().json;\nconst resp = $('Claude: Analyze').first().json;\nconst analysis = (resp && resp.content && resp.content[0]) ? resp.content[0].text : 'Анализ недоступен';\nconst icon = ctx.failPct > 30 ? '🚨' : ctx.anomalies.length > 0 ? '⚠️' : '✅';\nconst date = new Date().toLocaleDateString('ru-RU');\nconst msg = icon + ' GG Exchange ' + date + ' ' + ctx.sf.fail_pct + '% SHOP_FAILED ' + ctx.sf.shop_failed + '/' + ctx.sf.total_ym + ' YM | EUR ' + (ctx.rev.eur_today||0) + ' сегодня | EUR ' + (ctx.rev.eur_30d||0) + ' 30д | каталог ' + ctx.cat.active + ' 🤖 ' + analysis;\nreturn [{ json: { msg } }];"
+        }
+      },
+      {
+        "id": "n10",
+        "name": "Telegram: Send Brief",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1540,
+          540
+        ],
+        "parameters": {
+          "chatId": "83436260",
+          "text": "={{ $json.msg }}",
+          "additionalFields": {}
+        },
+        "credentials": {
+          "telegramApi": {
+            "id": "IjoBfA5jgnMrU9qV",
+            "name": "GG Telegram Bot"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Schedule 07:00 UTC": {
+        "main": [
+          [
+            {
+              "node": "PG: SHOP_FAILED Stats",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "PG: SHOP_FAILED Stats": {
+        "main": [
+          [
+            {
+              "node": "PG: Revenue Today",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "PG: Revenue Today": {
+        "main": [
+          [
+            {
+              "node": "PG: Catalog Health",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "PG: Catalog Health": {
+        "main": [
+          [
+            {
+              "node": "PG: SHOP_FAILED Details",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "PG: SHOP_FAILED Details": {
+        "main": [
+          [
+            {
+              "node": "Code: Build Context",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code: Build Context": {
+        "main": [
+          [
+            {
+              "node": "Claude: Analyze",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Claude: Analyze": {
+        "main": [
+          [
+            {
+              "node": "Code: Format Telegram",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Code: Format Telegram": {
+        "main": [
+          [
+            {
+              "node": "Telegram: Send Brief",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
