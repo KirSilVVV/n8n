@@ -1,0 +1,203 @@
+{
+  "updatedAt": "2026-02-28T00:30:22.635Z",
+  "createdAt": "2026-02-28T00:23:48.327Z",
+  "id": "MgdXyzvYmeQWfSSt",
+  "name": "[UTIL] Render Keepalive",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 10
+            }
+          ]
+        }
+      },
+      "id": "schedule-keepalive",
+      "name": "Every 10 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://n8n-4d54.onrender.com/healthz",
+        "options": {
+          "timeout": 15000,
+          "response": {
+            "response": {
+              "fullResponse": true
+            }
+          }
+        }
+      },
+      "id": "ping-render",
+      "name": "Ping Render",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        480,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const statusCode = $input.first().json.statusCode || 200;\nconst ok = statusCode >= 200 && statusCode < 400;\nconsole.log(`Render ping: ${statusCode} - ${ok ? 'OK' : 'DOWN'}`);\nreturn [{ json: { statusCode, ok, timestamp: new Date().toISOString() } }];"
+      },
+      "id": "log-result",
+      "name": "Log Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Every 10 minutes": {
+      "main": [
+        [
+          {
+            "node": "Ping Render",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ping Render": {
+      "main": [
+        [
+          {
+            "node": "Log Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Every 10 minutes": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "23328f7e-cf91-4b72-bd87-524019c4214c",
+  "activeVersionId": "23328f7e-cf91-4b72-bd87-524019c4214c",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-02-28T00:23:48.327Z",
+      "createdAt": "2026-02-28T00:23:48.327Z",
+      "role": "workflow:owner",
+      "workflowId": "MgdXyzvYmeQWfSSt",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-02-28T00:30:22.723Z",
+    "createdAt": "2026-02-28T00:30:22.723Z",
+    "versionId": "23328f7e-cf91-4b72-bd87-524019c4214c",
+    "workflowId": "MgdXyzvYmeQWfSSt",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "minutes",
+                "minutesInterval": 10
+              }
+            ]
+          }
+        },
+        "id": "schedule-keepalive",
+        "name": "Every 10 minutes",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          240,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "url": "https://n8n-4d54.onrender.com/healthz",
+          "options": {
+            "timeout": 15000,
+            "response": {
+              "response": {
+                "fullResponse": true
+              }
+            }
+          }
+        },
+        "id": "ping-render",
+        "name": "Ping Render",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          480,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "const statusCode = $input.first().json.statusCode || 200;\nconst ok = statusCode >= 200 && statusCode < 400;\nconsole.log(`Render ping: ${statusCode} - ${ok ? 'OK' : 'DOWN'}`);\nreturn [{ json: { statusCode, ok, timestamp: new Date().toISOString() } }];"
+        },
+        "id": "log-result",
+        "name": "Log Result",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          720,
+          300
+        ]
+      }
+    ],
+    "connections": {
+      "Every 10 minutes": {
+        "main": [
+          [
+            {
+              "node": "Ping Render",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Ping Render": {
+        "main": [
+          [
+            {
+              "node": "Log Result",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
