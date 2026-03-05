@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T14:32:16.577Z",
+  "createdAt": "2026-03-01T14:32:16.577Z",
+  "id": "98vQWR6DyEqCxHB5",
+  "name": "[R] sample-od",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "rk-sample-od-001",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "rk-sample-od-001"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT id, external_order_id, status,\n  LEFT(order_data::text, 400) as order_data_raw\nFROM marketplace_order\nWHERE status IN ('completed','completed_with_review')\n  AND created_at > NOW() - INTERVAL '30 days'\nORDER BY created_at DESC LIMIT 5\n",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "Q",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Q",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "42d32ac4-37a8-4bf7-883c-f85db3eed105",
+  "activeVersionId": "42d32ac4-37a8-4bf7-883c-f85db3eed105",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:32:16.577Z",
+      "createdAt": "2026-03-01T14:32:16.577Z",
+      "role": "workflow:owner",
+      "workflowId": "98vQWR6DyEqCxHB5",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T14:32:16.584Z",
+    "createdAt": "2026-03-01T14:32:16.584Z",
+    "versionId": "42d32ac4-37a8-4bf7-883c-f85db3eed105",
+    "workflowId": "98vQWR6DyEqCxHB5",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "rk-sample-od-001",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "wh1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "rk-sample-od-001"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "\nSELECT id, external_order_id, status,\n  LEFT(order_data::text, 400) as order_data_raw\nFROM marketplace_order\nWHERE status IN ('completed','completed_with_review')\n  AND created_at > NOW() - INTERVAL '30 days'\nORDER BY created_at DESC LIMIT 5\n",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "Q",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          480,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Q",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
