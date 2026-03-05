@@ -1,0 +1,254 @@
+{
+  "updatedAt": "2026-02-28T00:23:57.637Z",
+  "createdAt": "2026-02-28T00:23:57.637Z",
+  "id": "j0kAQH8eXHtMCO51",
+  "name": "[PULSE] GG Order Watchdog",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Every 30 min",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  COUNT(*) FILTER (WHERE status = 'paid' AND updated_at < NOW() - INTERVAL '2 hours') AS stuck_paid,\n  COUNT(*) FILTER (WHERE status = 'created' AND updated_at < NOW() - INTERVAL '1 hour') AS abandoned_created,\n  COUNT(*) FILTER (WHERE status = 'in_progress' AND updated_at < NOW() - INTERVAL '4 hours') AS stuck_in_progress,\n  COUNT(*) FILTER (WHERE status = 'completed' AND updated_at > NOW() - INTERVAL '30 minutes') AS just_completed,\n  COUNT(*) FILTER (WHERE status = 'cancelled_after_payment' AND updated_at > NOW() - INTERVAL '30 minutes') AS recent_refunds,\n  COALESCE(SUM(CASE WHEN status IN ('completed', 'completed_with_review') AND updated_at > NOW() - INTERVAL '30 minutes' THEN (content->>'total')::numeric ELSE 0 END), 0) AS revenue_30min\nFROM marketplace_order;",
+        "options": {}
+      },
+      "id": "postgres-stats",
+      "name": "DB: Get Order Stats",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "name": "VVV.Cash DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  o.id,\n  o.status,\n  ROUND(EXTRACT(EPOCH FROM (NOW() - o.updated_at))/3600, 1) AS hours_stuck,\n  (o.content->>'total')::numeric / 100.0 AS total_eur,\n  p.title AS product_title\nFROM marketplace_order o\nLEFT JOIN LATERAL (\n  SELECT m.title FROM marketplace m \n  WHERE m.id = (o.content->'items'->0->>'id')::integer\n  LIMIT 1\n) p ON true\nWHERE o.status IN ('paid', 'in_progress')\n  AND o.updated_at < NOW() - INTERVAL '2 hours'\nORDER BY o.updated_at ASC\nLIMIT 5;",
+        "options": {}
+      },
+      "id": "postgres-stuck",
+      "name": "DB: Get Stuck Orders Detail",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        460,
+        480
+      ],
+      "credentials": {
+        "postgres": {
+          "name": "VVV.Cash DB"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const stats = $('DB: Get Order Stats').first().json;\nconst stuck = $('DB: Get Stuck Orders Detail').all();\n\nconst stuckPaid = parseInt(stats.stuck_paid || 0);\nconst abandoned = parseInt(stats.abandoned_created || 0);\nconst stuckProgress = parseInt(stats.stuck_in_progress || 0);\nconst justCompleted = parseInt(stats.just_completed || 0);\nconst recentRefunds = parseInt(stats.recent_refunds || 0);\nconst revenue = parseFloat(stats.revenue_30min || 0) / 100;\n\n// Build alert message\nlet alerts = [];\nlet hasIssues = false;\n\nif (stuckPaid > 0) {\n  hasIssues = true;\n  alerts.push(`🔴 *PAID зависших:* ${stuckPaid} заказов > 2ч`);\n}\nif (stuckProgress > 0) {\n  hasIssues = true;\n  alerts.push(`🟠 *IN_PROGRESS зависших:* ${stuckProgress} заказов > 4ч`);\n}\nif (abandoned > 5) {\n  hasIssues = true;\n  alerts.push(`🟡 *Брошенных CREATED:* ${abandoned} > 1ч`);\n}\nif (recentRefunds >= 3) {\n  hasIssues = true;\n  alerts.push(`⚠️ *Возвратов за 30мин:* ${recentRefunds} — проверить!`);\n}\n\n// Build stuck orders detail\nlet stuckDetail = '';\nif (stuck.length > 0) {\n  stuckDetail = '\\n\\n*Зависшие заказы:*\\n';\n  stuck.forEach(s => {\n    const item = s.json;\n    stuckDetail += `• #${item.id} | ${item.status} | ${item.hours_stuck}ч | €${(item.total_eur || 0).toFixed(2)} | ${item.product_title || 'Unknown'}\\n`;\n  });\n}\n\n// Pulse line (always send)\nconst pulse = `📡 *GG Pulse* | ${new Date().toLocaleTimeString('ru-RU', {timeZone: 'Europe/Moscow', hour: '2-digit', minute: '2-digit'})}\\n\\n` +\n  `✅ Завершено за 30мин: ${justCompleted}\\n` +\n  `💰 Выручка за 30мин: €${revenue.toFixed(2)}\\n` +\n  `❌ Возвратов: ${recentRefunds}\\n` +\n  `🛒 Брошенных: ${abandoned}`;\n\nlet fullMessage = pulse;\nif (hasIssues) {\n  fullMessage = `🚨 *ВНИМАНИЕ! Проблемы на бирже*\\n\\n` + alerts.join('\\n') + stuckDetail + '\\n\\n---\\n' + pulse;\n}\n\nreturn [{ json: { message: fullMessage, hasIssues } }];"
+      },
+      "id": "build-message",
+      "name": "Build Alert Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        700,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-issues",
+              "leftValue": "={{ $json.hasIssues }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-issues",
+      "name": "Has Issues?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        920,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $vars.TELEGRAM_ALERT_CHAT_ID }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "disable_notification": false
+        }
+      },
+      "id": "telegram-alert",
+      "name": "Telegram: ALERT",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1140,
+        260
+      ],
+      "credentials": {
+        "telegramApi": {
+          "name": "GG Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $vars.TELEGRAM_TEAM_CHAT_ID }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown",
+          "disable_notification": true
+        }
+      },
+      "id": "telegram-pulse",
+      "name": "Telegram: Pulse (silent)",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1140,
+        500
+      ],
+      "credentials": {
+        "telegramApi": {
+          "name": "GG Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 30 min": {
+      "main": [
+        [
+          {
+            "node": "DB: Get Order Stats",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "DB: Get Stuck Orders Detail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB: Get Order Stats": {
+      "main": [
+        [
+          {
+            "node": "Build Alert Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB: Get Stuck Orders Detail": {
+      "main": [
+        [
+          {
+            "node": "Build Alert Message",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Build Alert Message": {
+      "main": [
+        [
+          {
+            "node": "Has Issues?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Issues?": {
+      "main": [
+        [
+          {
+            "node": "Telegram: ALERT",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: Pulse (silent)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "errorWorkflow": "",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "a58e9ada-fd92-43d8-942e-e470267ce5b6",
+  "activeVersionId": null,
+  "triggerCount": 0,
+  "shared": [
+    {
+      "updatedAt": "2026-02-28T00:23:57.637Z",
+      "createdAt": "2026-02-28T00:23:57.637Z",
+      "role": "workflow:owner",
+      "workflowId": "j0kAQH8eXHtMCO51",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": null,
+  "tags": []
+}
