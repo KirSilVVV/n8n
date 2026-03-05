@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T14:33:49.713Z",
+  "createdAt": "2026-03-01T14:33:49.713Z",
+  "id": "2pUcQNOuBIPnq245",
+  "name": "[R]yest2",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "rk-yest-002",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "w",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "rk-yest-002"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT COUNT(*) as orders,\n  ROUND(SUM((content->>'total')::numeric/100),2) as eur\nFROM marketplace_order\nWHERE status IN ('completed','completed_with_review')\n  AND updated_at::date = CURRENT_DATE - 1\n",
+        "options": {}
+      },
+      "id": "p",
+      "name": "Q",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Q",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "01b42620-ee56-4f00-a75e-da754afb52f6",
+  "activeVersionId": "01b42620-ee56-4f00-a75e-da754afb52f6",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:33:49.713Z",
+      "createdAt": "2026-03-01T14:33:49.713Z",
+      "role": "workflow:owner",
+      "workflowId": "2pUcQNOuBIPnq245",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T14:33:49.726Z",
+    "createdAt": "2026-03-01T14:33:49.726Z",
+    "versionId": "01b42620-ee56-4f00-a75e-da754afb52f6",
+    "workflowId": "2pUcQNOuBIPnq245",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "rk-yest-002",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "w",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "rk-yest-002"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "\nSELECT COUNT(*) as orders,\n  ROUND(SUM((content->>'total')::numeric/100),2) as eur\nFROM marketplace_order\nWHERE status IN ('completed','completed_with_review')\n  AND updated_at::date = CURRENT_DATE - 1\n",
+          "options": {}
+        },
+        "id": "p",
+        "name": "Q",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          480,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Q",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
