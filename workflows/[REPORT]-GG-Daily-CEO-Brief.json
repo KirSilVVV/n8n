@@ -1,0 +1,348 @@
+{
+  "updatedAt": "2026-03-05T10:42:36.937Z",
+  "createdAt": "2026-02-28T00:24:02.031Z",
+  "id": "YVH67YNAB44TlTee",
+  "name": "[REPORT] GG Daily CEO Brief",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 9 * * *"
+            }
+          ]
+        }
+      },
+      "id": "schedule-9am",
+      "name": "Every day 09:00",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        384,
+        384
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH yesterday AS (\n  SELECT\n    COUNT(*) FILTER (WHERE status IN ('completed','completed_with_review')) AS orders_completed,\n    COUNT(*) FILTER (WHERE status LIKE 'cancelled_after%') AS orders_refunded,\n    COUNT(*) FILTER (WHERE status = 'created') AS orders_abandoned,\n    COUNT(DISTINCT account_id) AS unique_buyers,\n    COUNT(DISTINCT seller_id) AS active_sellers,\n    COALESCE(SUM(CASE WHEN status IN ('completed','completed_with_review') THEN (content->>'total')::numeric ELSE 0 END), 0) AS gmv_cents,\n    COALESCE(SUM(CASE WHEN status LIKE 'cancelled_after%' THEN (content->>'total')::numeric ELSE 0 END), 0) AS refunded_cents\n  FROM marketplace_order\n  WHERE created_at::date = CURRENT_DATE - 1\n),\nday_before AS (\n  SELECT\n    COUNT(*) FILTER (WHERE status IN ('completed','completed_with_review')) AS orders_completed,\n    COALESCE(SUM(CASE WHEN status IN ('completed','completed_with_review') THEN (content->>'total')::numeric ELSE 0 END), 0) AS gmv_cents\n  FROM marketplace_order\n  WHERE created_at::date = CURRENT_DATE - 2\n),\nnew_sellers AS (\n  SELECT COUNT(DISTINCT account_id) as count\n  FROM marketplace\n  WHERE created_at::date = CURRENT_DATE - 1\n    AND moderated = true\n),\ntop_product AS (\n  SELECT \n    m.title,\n    COUNT(o.id) as sale_count\n  FROM marketplace_order o\n  JOIN LATERAL (\n    SELECT m2.title FROM marketplace m2 \n    WHERE m2.id = (o.content->'items'->0->>'id')::integer LIMIT 1\n  ) m ON true\n  WHERE o.created_at::date = CURRENT_DATE - 1\n    AND o.status IN ('completed','completed_with_review')\n  GROUP BY m.title\n  ORDER BY sale_count DESC\n  LIMIT 1\n),\npending_moderation AS (\n  SELECT COUNT(*) as count FROM marketplace\n  WHERE moderated = false AND hidden = false\n)\nSELECT\n  y.orders_completed,\n  y.orders_refunded,\n  y.orders_abandoned,\n  y.unique_buyers,\n  y.active_sellers,\n  ROUND(y.gmv_cents / 100.0, 2) AS gmv_eur,\n  ROUND(y.refunded_cents / 100.0, 2) AS refunded_eur,\n  CASE WHEN y.orders_completed > 0 THEN ROUND(y.orders_refunded::numeric / y.orders_completed * 100, 1) ELSE 0 END AS refund_rate_pct,\n  CASE WHEN db.gmv_cents > 0 THEN ROUND((y.gmv_cents - db.gmv_cents)::numeric / db.gmv_cents * 100, 1) ELSE 0 END AS gmv_delta_pct,\n  db.orders_completed AS prev_orders,\n  ROUND(db.gmv_cents / 100.0, 2) AS prev_gmv_eur,\n  ns.count AS new_products_listed,\n  COALESCE(tp.title, 'N/A') AS top_product,\n  COALESCE(tp.sale_count, 0) AS top_product_sales,\n  pm.count AS pending_moderation_count\nFROM yesterday y, day_before db, new_sellers ns, pending_moderation pm\nLEFT JOIN top_product tp ON true;",
+        "options": {}
+      },
+      "id": "postgres-daily",
+      "name": "DB: Yesterday Analytics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        608,
+        384
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n  brand,\n  COUNT(o.id) as sales,\n  ROUND(SUM((o.content->>'total')::numeric) / 100.0, 2) as revenue_eur\nFROM marketplace_order o\nJOIN LATERAL (\n  SELECT m.brand FROM marketplace m\n  WHERE m.id = (o.content->'items'->0->>'id')::integer LIMIT 1\n) m ON true\nWHERE o.created_at::date = CURRENT_DATE - 1\n  AND o.status IN ('completed','completed_with_review')\nGROUP BY brand\nORDER BY revenue_eur DESC\nLIMIT 5;",
+        "options": {}
+      },
+      "id": "postgres-brands",
+      "name": "DB: Top Brands Yesterday",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        608,
+        544
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const stats = $('DB: Yesterday Analytics').first().json;\nconst brands = $('DB: Top Brands Yesterday').all();\n\nconst yesterday = new Date();\nyesterday.setDate(yesterday.getDate() - 1);\nconst dateStr = yesterday.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });\n\n// GMV delta arrow\nconst delta = parseFloat(stats.gmv_delta_pct || 0);\nconst deltaStr = delta >= 0 ? `📈 +${delta}%` : `📉 ${delta}%`;\n\n// Refund rate color\nconst refundRate = parseFloat(stats.refund_rate_pct || 0);\nconst refundEmoji = refundRate > 10 ? '🔴' : refundRate > 5 ? '🟡' : '🟢';\n\n// Build brand table\nlet brandLines = '';\nif (brands.length > 0) {\n  brandLines = '\\n\\n*🎮 Топ брендов:*\\n';\n  brands.forEach((b, i) => {\n    const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];\n    brandLines += `${medals[i]} ${b.json.brand}: ${b.json.sales} продаж | €${b.json.revenue_eur}\\n`;\n  });\n} else {\n  brandLines = '\\n\\n_Продаж вчера не было_';\n}\n\n// Pending moderation warning\nconst pendingMod = parseInt(stats.pending_moderation_count || 0);\nlet moderationAlert = '';\nif (pendingMod > 0) {\n  moderationAlert = `\\n\\n⏳ *На модерации:* ${pendingMod} товаров — нужна проверка!`;\n}\n\nconst message = `🌅 *Gaming Goods — Daily Brief*\\n${dateStr}\\n\\n` +\n  `💰 *GMV:* €${stats.gmv_eur || '0.00'} ${deltaStr}\\n` +\n  `   (вчера: €${stats.prev_gmv_eur || '0.00'})\\n\\n` +\n  `✅ *Заказов завершено:* ${stats.orders_completed || 0}\\n` +\n  `${refundEmoji} *Возвратов:* ${stats.orders_refunded || 0} (${stats.refund_rate_pct || 0}%)\\n` +\n  `🛒 *Брошено:* ${stats.orders_abandoned || 0} заказов\\n\\n` +\n  `👥 *Покупателей:* ${stats.unique_buyers || 0}\\n` +\n  `🏪 *Продавцов активных:* ${stats.active_sellers || 0}\\n` +\n  `📦 *Новых товаров:* ${stats.new_products_listed || 0}\\n\\n` +\n  `🏆 *Топ товар:* ${stats.top_product} (${stats.top_product_sales} продаж)` +\n  brandLines +\n  moderationAlert;\n\nreturn [{ json: { message } }];"
+      },
+      "id": "build-daily-report",
+      "name": "Build Daily Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        864,
+        464
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "83436260",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "telegram-report",
+      "name": "Telegram: Send Report",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1104,
+        464
+      ],
+      "webhookId": "94c26041-2554-401d-982a-6678ce806949",
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every day 09:00": {
+      "main": [
+        [
+          {
+            "node": "DB: Yesterday Analytics",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "DB: Top Brands Yesterday",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB: Yesterday Analytics": {
+      "main": [
+        [
+          {
+            "node": "Build Daily Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DB: Top Brands Yesterday": {
+      "main": [
+        [
+          {
+            "node": "Build Daily Report",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Build Daily Report": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Send Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Every day 09:00": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": {},
+  "versionId": "f9e6ede2-2380-41b9-a919-f3ac063eb48b",
+  "activeVersionId": "f9e6ede2-2380-41b9-a919-f3ac063eb48b",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-02-28T00:24:02.031Z",
+      "createdAt": "2026-02-28T00:24:02.031Z",
+      "role": "workflow:owner",
+      "workflowId": "YVH67YNAB44TlTee",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-05T10:42:36.938Z",
+    "createdAt": "2026-03-05T10:42:36.938Z",
+    "versionId": "f9e6ede2-2380-41b9-a919-f3ac063eb48b",
+    "workflowId": "YVH67YNAB44TlTee",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 9 * * *"
+              }
+            ]
+          }
+        },
+        "id": "schedule-9am",
+        "name": "Every day 09:00",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          384,
+          384
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "WITH yesterday AS (\n  SELECT\n    COUNT(*) FILTER (WHERE status IN ('completed','completed_with_review')) AS orders_completed,\n    COUNT(*) FILTER (WHERE status LIKE 'cancelled_after%') AS orders_refunded,\n    COUNT(*) FILTER (WHERE status = 'created') AS orders_abandoned,\n    COUNT(DISTINCT account_id) AS unique_buyers,\n    COUNT(DISTINCT seller_id) AS active_sellers,\n    COALESCE(SUM(CASE WHEN status IN ('completed','completed_with_review') THEN (content->>'total')::numeric ELSE 0 END), 0) AS gmv_cents,\n    COALESCE(SUM(CASE WHEN status LIKE 'cancelled_after%' THEN (content->>'total')::numeric ELSE 0 END), 0) AS refunded_cents\n  FROM marketplace_order\n  WHERE created_at::date = CURRENT_DATE - 1\n),\nday_before AS (\n  SELECT\n    COUNT(*) FILTER (WHERE status IN ('completed','completed_with_review')) AS orders_completed,\n    COALESCE(SUM(CASE WHEN status IN ('completed','completed_with_review') THEN (content->>'total')::numeric ELSE 0 END), 0) AS gmv_cents\n  FROM marketplace_order\n  WHERE created_at::date = CURRENT_DATE - 2\n),\nnew_sellers AS (\n  SELECT COUNT(DISTINCT account_id) as count\n  FROM marketplace\n  WHERE created_at::date = CURRENT_DATE - 1\n    AND moderated = true\n),\ntop_product AS (\n  SELECT \n    m.title,\n    COUNT(o.id) as sale_count\n  FROM marketplace_order o\n  JOIN LATERAL (\n    SELECT m2.title FROM marketplace m2 \n    WHERE m2.id = (o.content->'items'->0->>'id')::integer LIMIT 1\n  ) m ON true\n  WHERE o.created_at::date = CURRENT_DATE - 1\n    AND o.status IN ('completed','completed_with_review')\n  GROUP BY m.title\n  ORDER BY sale_count DESC\n  LIMIT 1\n),\npending_moderation AS (\n  SELECT COUNT(*) as count FROM marketplace\n  WHERE moderated = false AND hidden = false\n)\nSELECT\n  y.orders_completed,\n  y.orders_refunded,\n  y.orders_abandoned,\n  y.unique_buyers,\n  y.active_sellers,\n  ROUND(y.gmv_cents / 100.0, 2) AS gmv_eur,\n  ROUND(y.refunded_cents / 100.0, 2) AS refunded_eur,\n  CASE WHEN y.orders_completed > 0 THEN ROUND(y.orders_refunded::numeric / y.orders_completed * 100, 1) ELSE 0 END AS refund_rate_pct,\n  CASE WHEN db.gmv_cents > 0 THEN ROUND((y.gmv_cents - db.gmv_cents)::numeric / db.gmv_cents * 100, 1) ELSE 0 END AS gmv_delta_pct,\n  db.orders_completed AS prev_orders,\n  ROUND(db.gmv_cents / 100.0, 2) AS prev_gmv_eur,\n  ns.count AS new_products_listed,\n  COALESCE(tp.title, 'N/A') AS top_product,\n  COALESCE(tp.sale_count, 0) AS top_product_sales,\n  pm.count AS pending_moderation_count\nFROM yesterday y, day_before db, new_sellers ns, pending_moderation pm\nLEFT JOIN top_product tp ON true;",
+          "options": {}
+        },
+        "id": "postgres-daily",
+        "name": "DB: Yesterday Analytics",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          608,
+          384
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT\n  brand,\n  COUNT(o.id) as sales,\n  ROUND(SUM((o.content->>'total')::numeric) / 100.0, 2) as revenue_eur\nFROM marketplace_order o\nJOIN LATERAL (\n  SELECT m.brand FROM marketplace m\n  WHERE m.id = (o.content->'items'->0->>'id')::integer LIMIT 1\n) m ON true\nWHERE o.created_at::date = CURRENT_DATE - 1\n  AND o.status IN ('completed','completed_with_review')\nGROUP BY brand\nORDER BY revenue_eur DESC\nLIMIT 5;",
+          "options": {}
+        },
+        "id": "postgres-brands",
+        "name": "DB: Top Brands Yesterday",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          608,
+          544
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "const stats = $('DB: Yesterday Analytics').first().json;\nconst brands = $('DB: Top Brands Yesterday').all();\n\nconst yesterday = new Date();\nyesterday.setDate(yesterday.getDate() - 1);\nconst dateStr = yesterday.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });\n\n// GMV delta arrow\nconst delta = parseFloat(stats.gmv_delta_pct || 0);\nconst deltaStr = delta >= 0 ? `📈 +${delta}%` : `📉 ${delta}%`;\n\n// Refund rate color\nconst refundRate = parseFloat(stats.refund_rate_pct || 0);\nconst refundEmoji = refundRate > 10 ? '🔴' : refundRate > 5 ? '🟡' : '🟢';\n\n// Build brand table\nlet brandLines = '';\nif (brands.length > 0) {\n  brandLines = '\\n\\n*🎮 Топ брендов:*\\n';\n  brands.forEach((b, i) => {\n    const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];\n    brandLines += `${medals[i]} ${b.json.brand}: ${b.json.sales} продаж | €${b.json.revenue_eur}\\n`;\n  });\n} else {\n  brandLines = '\\n\\n_Продаж вчера не было_';\n}\n\n// Pending moderation warning\nconst pendingMod = parseInt(stats.pending_moderation_count || 0);\nlet moderationAlert = '';\nif (pendingMod > 0) {\n  moderationAlert = `\\n\\n⏳ *На модерации:* ${pendingMod} товаров — нужна проверка!`;\n}\n\nconst message = `🌅 *Gaming Goods — Daily Brief*\\n${dateStr}\\n\\n` +\n  `💰 *GMV:* €${stats.gmv_eur || '0.00'} ${deltaStr}\\n` +\n  `   (вчера: €${stats.prev_gmv_eur || '0.00'})\\n\\n` +\n  `✅ *Заказов завершено:* ${stats.orders_completed || 0}\\n` +\n  `${refundEmoji} *Возвратов:* ${stats.orders_refunded || 0} (${stats.refund_rate_pct || 0}%)\\n` +\n  `🛒 *Брошено:* ${stats.orders_abandoned || 0} заказов\\n\\n` +\n  `👥 *Покупателей:* ${stats.unique_buyers || 0}\\n` +\n  `🏪 *Продавцов активных:* ${stats.active_sellers || 0}\\n` +\n  `📦 *Новых товаров:* ${stats.new_products_listed || 0}\\n\\n` +\n  `🏆 *Топ товар:* ${stats.top_product} (${stats.top_product_sales} продаж)` +\n  brandLines +\n  moderationAlert;\n\nreturn [{ json: { message } }];"
+        },
+        "id": "build-daily-report",
+        "name": "Build Daily Report",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          864,
+          464
+        ]
+      },
+      {
+        "parameters": {
+          "chatId": "83436260",
+          "text": "={{ $json.message }}",
+          "additionalFields": {
+            "parse_mode": "Markdown"
+          }
+        },
+        "id": "telegram-report",
+        "name": "Telegram: Send Report",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1104,
+          464
+        ],
+        "webhookId": "94c26041-2554-401d-982a-6678ce806949",
+        "credentials": {
+          "telegramApi": {
+            "id": "IjoBfA5jgnMrU9qV",
+            "name": "GG Telegram Bot"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Every day 09:00": {
+        "main": [
+          [
+            {
+              "node": "DB: Yesterday Analytics",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "DB: Top Brands Yesterday",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "DB: Yesterday Analytics": {
+        "main": [
+          [
+            {
+              "node": "Build Daily Report",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "DB: Top Brands Yesterday": {
+        "main": [
+          [
+            {
+              "node": "Build Daily Report",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "Build Daily Report": {
+        "main": [
+          [
+            {
+              "node": "Telegram: Send Report",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
