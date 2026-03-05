@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T14:33:58.255Z",
+  "createdAt": "2026-03-01T14:33:58.255Z",
+  "id": "Ahk2b1yWceGgw2jH",
+  "name": "[R]seg2",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "rk-seg-002",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "w",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "rk-seg-002"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT\n  CASE\n    WHEN content->'items'->0->>'brand' = 'Nutaku' THEN 'Nutaku'\n    WHEN order_data->>'source' = 'yandex_market' THEN 'YM'\n    ELSE 'SEO'\n  END as seg,\n  COUNT(*) as orders,\n  ROUND(SUM((content->>'total')::numeric/100),2) as eur\nFROM marketplace_order\nWHERE status IN ('completed','completed_with_review')\n  AND updated_at::date = CURRENT_DATE - 1\nGROUP BY 1 ORDER BY 1\n",
+        "options": {}
+      },
+      "id": "p",
+      "name": "Q",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Q",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "ad5cf02e-a9cd-4ba9-8428-f15c4852e1c9",
+  "activeVersionId": "ad5cf02e-a9cd-4ba9-8428-f15c4852e1c9",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:33:58.255Z",
+      "createdAt": "2026-03-01T14:33:58.255Z",
+      "role": "workflow:owner",
+      "workflowId": "Ahk2b1yWceGgw2jH",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T14:33:58.329Z",
+    "createdAt": "2026-03-01T14:33:58.329Z",
+    "versionId": "ad5cf02e-a9cd-4ba9-8428-f15c4852e1c9",
+    "workflowId": "Ahk2b1yWceGgw2jH",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "rk-seg-002",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "w",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "rk-seg-002"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "\nSELECT\n  CASE\n    WHEN content->'items'->0->>'brand' = 'Nutaku' THEN 'Nutaku'\n    WHEN order_data->>'source' = 'yandex_market' THEN 'YM'\n    ELSE 'SEO'\n  END as seg,\n  COUNT(*) as orders,\n  ROUND(SUM((content->>'total')::numeric/100),2) as eur\nFROM marketplace_order\nWHERE status IN ('completed','completed_with_review')\n  AND updated_at::date = CURRENT_DATE - 1\nGROUP BY 1 ORDER BY 1\n",
+          "options": {}
+        },
+        "id": "p",
+        "name": "Q",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          480,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Q",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
