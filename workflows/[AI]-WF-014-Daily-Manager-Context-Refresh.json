@@ -1,0 +1,495 @@
+{
+  "updatedAt": "2026-03-05T10:42:38.971Z",
+  "createdAt": "2026-03-01T11:01:42.926Z",
+  "id": "BkvZZxZoyp9vSnrg",
+  "name": "[AI] WF-014 Daily Manager Context Refresh",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "sched1",
+      "name": "⏰ Schedule 06:00 UTC",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  (SELECT COUNT(*) FROM marketplace WHERE moderated=true AND hidden=false)::int as active_listings,\n  (SELECT COUNT(*) FROM marketplace WHERE moderated=false AND hidden=false)::int as pending_moderation,\n  (SELECT COUNT(*) FROM marketplace WHERE quantity=0 AND hidden=false AND moderated=true)::int as out_of_stock_visible,\n  (SELECT COUNT(*) FROM marketplace_order WHERE status='fulfilled')::int as stuck_fulfilled,\n  (SELECT COUNT(*) FROM marketplace_order WHERE status='completed' AND created_at > NOW()-INTERVAL '30 days')::int as completed_30d,\n  (SELECT COUNT(*) FROM marketplace_order WHERE status='completed' AND created_at > NOW()-INTERVAL '7 days')::int as completed_7d,\n  (SELECT COUNT(*) FROM marketplace_order WHERE status='completed' AND created_at > NOW()-INTERVAL '24 hours')::int as completed_today,\n  (SELECT COUNT(*) FROM marketplace_order WHERE created_at > NOW()-INTERVAL '7 days')::int as orders_7d,\n  (SELECT COUNT(*) FROM marketplace_order WHERE created_at > NOW()-INTERVAL '24 hours')::int as orders_24h,\n  (SELECT COALESCE(moderated, false) FROM marketplace WHERE id=2067417 LIMIT 1) as re_requiem_moderated,\n  (SELECT COUNT(*) FROM marketplace_review WHERE created_at > NOW()-INTERVAL '7 days')::int as new_reviews_7d,\n  TO_CHAR(NOW(), 'DD.MM.YYYY HH24:MI') as checked_at",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "🗄️ PG: Business Metrics",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        240,
+        280
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\n// Generate Google OAuth2 JWT token for GA4 + GSC\nconst crypto = require('crypto');\n\nconst serviceAccount = {\n  client_email: \"ga4-mcp@ru-gg-438811.iam.gserviceaccount.com\",\n  private_key: \"-----BEGIN PRIVATE KEY-----\\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC8U0mwWxcfKAzA\\nGIv7BJk3yB2eoa+ZU2i+fxZFh5D9qO8K6GPKPV1U9emdkFPI3Eb633XiMg8yIj1z\\nYLtLarV4EMw/doyrKJE0XNTzlU/hgvmvAz1n1L9pbSqc/8Ay9FrTKwdZij9qfkg7\\n1zNBQX8OG49wqkUxm2QV5Lgfr0V30saO3d8VkzG1OC9BAALriuI53IjrTUP7qfuT\\nq9yi/Fb88vZajtE5RzUGX52PVlrchACI2uMmZf8lEkCKWNulIGchxXZptHLg4etE\\nWLoQcPrt43SUhZkimAeOg2I0QTOGS/jmCWI1OWyAzzj+eOH8aP4n+RbIN4MBTJxD\\nIS02QypzAgMBAAECggEACuc38kKb1WOmtVQJsRTd+aZK3Lb+T4sbAQ7V9cMr1RvI\\no/uHYRtpzpqI/EsLJsTMd6E9yUSq4sHe7lHXFiTNijy17ovioggwiMHbjGZRIFYw\\nz+Q8OmMAjM4gTcQOClH7Li2k3v2Li8Ykg95pavZFSl/n6P1BEbNHuW+Rn2sw3O2y\\ncS4IvwTKnN1v8dA5WTeyKsNZye8HqpbFKYbDA1O1vopBvvtBADpwDDELKnZswn+5\\nVNBAmutRB+GFT2FwPYMO8K6g3nNhNvzXdhkXXIXDenanDp6ksHAvt2iwmSBQGwJB\\n/Lw0qeYTKa43dC/rmQvWq+RFz/gDYhvo2Wb4eOvVGQKBgQDxMJJvwKkJfFpg5ybo\\nVOHd4NxNXR+Z9uOh7/3ah69uHAZCwjlFtCf7AFwy/P4MafX+xLP+DEv7vviHP8nh\\nBKgkpbMnoD4g3tTyfEsGqNdNinz6cHln38zkLOJz9WMDlSTvbzIjEJITC0b2dP9Y\\nymLhtbuG+yekAZgOootEq0vN6QKBgQDH47Q2pZsWW+8LPSfE7tqAEA7sjKwrcAdf\\nubGFTw/Djss0LRPkOTkJEMg27hPIY/ZOYB2mfD3Q55yYYSThsYM/OtnKsIkepUT2\\nJ3qgYlKOuLTxYbpzzrT4gvAeiFJEQXGeP6ve2aibYv41PsfnJHJPmz7bW4JGnEaZ\\nzgSuhP6v+wKBgHVgZAOKyTjakclS9PZgSMOIKO5lgXmWU1V9zBbLra5yaQGYL/Mi\\nJ8rZdAVEZgZ4ksT3yXi7V0ceuyhm/MJLV+Dt2vBP5axthUi1AHYvOQh9ezEOB6dr\\nnPT2ewZfx134+U6k2MuDxvMJq/FJIvN9Gv4pSSf5lmMUe4GzzP8QNgXxAoGBALlp\\nN2JxHngQ8pykL112iOq8+nrkyVbJZa2fW1DiUyb8LvTI02igw4zrKiv5jhQU1QVC\\nFn61Q8mg7RpTEZjfxXRDLH3cXnQ0rND/MbnPOfD017IHCqIdHLRfEEfh/x0c7zzw\\npoXhs4neuxm8kESRBA9fW2Cxcxf4IWzNMn6HEo89AoGBAJisf2bG/OniOz7Wdy09\\nALAZDV1pS2rHewxiIzL4nqZhR8EbQSoFocJyd19NAT7ASy9iuSzc/x9U80B4Gv3A\\nJxiZ2l6+MLEfQHvLoNX7MxTsiuTtHnZY7jCqlcFlOaKJKiVrYYJFQriqi58HC95Y\\ntVHZjilwvVGvxfdc/eDXqGDB\\n-----END PRIVATE KEY-----\\n\"\n};\n\nfunction base64url(str) {\n  return Buffer.from(str).toString('base64')\n    .replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=/g, '');\n}\n\nconst now = Math.floor(Date.now() / 1000);\nconst header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));\nconst payload = base64url(JSON.stringify({\n  iss: serviceAccount.client_email,\n  scope: 'https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly',\n  aud: 'https://oauth2.googleapis.com/token',\n  exp: now + 3600,\n  iat: now\n}));\n\nconst signInput = header + '.' + payload;\nconst sign = crypto.createSign('RSA-SHA256');\nsign.update(signInput);\nconst signature = sign.sign(serviceAccount.private_key.replace(/\\\\n/g, '\\n'), 'base64')\n  .replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=/g, '');\nconst jwt = signInput + '.' + signature;\n\n// Exchange JWT for access token\nconst tokenResp = await $helpers.httpRequest({\n  method: 'POST',\n  url: 'https://oauth2.googleapis.com/token',\n  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n  body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`\n});\n\nconst token = JSON.parse(tokenResp).access_token;\n\n// GA4 Report - 3 date ranges at once\nconst ga4Resp = await $helpers.httpRequest({\n  method: 'POST', \n  url: 'https://analyticsdata.googleapis.com/v1beta/properties/511167634:runReport',\n  headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    dateRanges: [\n      { startDate: 'yesterday', endDate: 'yesterday', name: 'yesterday' },\n      { startDate: '7daysAgo', endDate: 'today', name: 'last7d' },\n      { startDate: '30daysAgo', endDate: 'today', name: 'last30d' }\n    ],\n    metrics: [\n      { name: 'sessions' },\n      { name: 'conversions' },\n      { name: 'totalRevenue' }\n    ]\n  })\n});\nconst ga4 = JSON.parse(ga4Resp);\n\n// Parse GA4 rows\nconst hm = {};\n(ga4.metricHeaders || []).forEach((h, i) => hm[h.name] = i);\nlet sess_yd=0, conv_yd=0, rev_yd=0;\nlet sess_7d=0, conv_7d=0, rev_7d=0;\nlet sess_30d=0, conv_30d=0, rev_30d=0;\n\n(ga4.rows || []).forEach(r => {\n  const range = (r.dimensionValues || [{value:''}])[0].value;\n  const v = r.metricValues || [];\n  const get = k => parseFloat(v[hm[k]]?.value || 0);\n  if (range==='yesterday') { sess_yd=get('sessions'); conv_yd=get('conversions'); rev_yd=get('totalRevenue'); }\n  else if (range==='last7d') { sess_7d=get('sessions'); conv_7d=get('conversions'); rev_7d=get('totalRevenue'); }\n  else if (range==='last30d') { sess_30d=get('sessions'); conv_30d=get('conversions'); rev_30d=get('totalRevenue'); }\n});\n\n// GSC Top Queries\nconst gscResp = await $helpers.httpRequest({\n  method: 'POST',\n  url: 'https://www.googleapis.com/webmasters/v3/sites/sc-domain%3Agaming-goods.ru/searchAnalytics/query',\n  headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    startDate: new Date(Date.now() - 30*86400000).toISOString().slice(0,10),\n    endDate: new Date().toISOString().slice(0,10),\n    dimensions: ['query'],\n    rowLimit: 8\n  })\n});\nconst gsc = JSON.parse(gscResp);\nconst topQueries = (gsc.rows || []).slice(0,5).map(r => ({\n  q: r.keys[0],\n  clicks: r.clicks,\n  ctr: (r.ctr*100).toFixed(1)+'%',\n  pos: r.position.toFixed(1)\n}));\n\nconst avgRevDay = rev_30d > 0 ? (rev_30d/30).toFixed(0) : 0;\nconst cr30 = sess_30d > 0 ? (conv_30d/sess_30d*100).toFixed(1) : '0';\n\nreturn [{ json: {\n  token, // pass token forward for reuse\n  // GA4\n  sess_yd: Math.round(sess_yd), conv_yd: Math.round(conv_yd), rev_yd: rev_yd.toFixed(0),\n  sess_7d: Math.round(sess_7d), conv_7d: Math.round(conv_7d), rev_7d: rev_7d.toFixed(0),\n  sess_30d: Math.round(sess_30d), conv_30d: Math.round(conv_30d), rev_30d: rev_30d.toFixed(0),\n  avg_rev_day: avgRevDay,\n  cr30,\n  // GSC\n  top_queries: topQueries\n} }];\n"
+      },
+      "id": "code1",
+      "name": "🔑 GA4 + GSC Fetch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        520
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combineBySql",
+        "numberInputs": 2,
+        "query": "SELECT * FROM input1 JOIN input2 ON TRUE"
+      },
+      "id": "merge1",
+      "name": "🔀 Merge PG + GA4",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        480,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst d = $input.item.json;\n\n// Helpers\nconst int = k => parseInt(d[k] || 0);\nconst str = k => String(d[k] || '');\nconst pct = (n, d2) => d2 > 0 ? (n/d2*100).toFixed(1)+'%' : '0%';\n\nconst pg = {\n  active: int('active_listings'),\n  pending: int('pending_moderation'),\n  oos: int('out_of_stock_visible'),\n  stuck: int('stuck_fulfilled'),\n  comp_today: int('completed_today'),\n  comp_7d: int('completed_7d'),\n  comp_30d: int('completed_30d'),\n  orders_7d: int('orders_7d'),\n  orders_24h: int('orders_24h'),\n  re_ok: d.re_requiem_moderated === true || d.re_requiem_moderated === 'true',\n  reviews_7d: int('new_reviews_7d'),\n  date: str('checked_at')\n};\n\nconst ga = {\n  sess_yd: int('sess_yd'), conv_yd: int('conv_yd'), rev_yd: str('rev_yd'),\n  sess_7d: int('sess_7d'), rev_7d: str('rev_7d'),\n  sess_30d: int('sess_30d'), conv_30d: int('conv_30d'), rev_30d: str('rev_30d'),\n  avg_day: str('avg_rev_day'), cr30: str('cr30')\n};\n\nconst tq = (d.top_queries || []).map(q => `${q.q}: ${q.clicks} кл, CTR ${q.ctr}, поз ${q.pos}`).join(' | ');\n\nconst now = new Date().toISOString();\n\n// Build 4 context objects\nconst contexts = {\n  seo: {\n    updated_at: now,\n    active_listings: pg.active,\n    out_of_stock_visible: pg.oos,\n    re_requiem_moderated: pg.re_ok,\n    sessions_7d: ga.sess_7d,\n    sessions_30d: ga.sess_30d,\n    conv_rate_30d: ga.cr30 + '%',\n    top_queries: tq || 'нет данных',\n    alerts: [\n      pg.oos > 5000 ? `🔴 ${pg.oos.toLocaleString()} OOS товаров видимы — thin content вредит индексации` : null,\n      pg.oos > 1000 && pg.oos <= 5000 ? `⚠️ ${pg.oos.toLocaleString()} OOS товаров видимы` : null,\n      !pg.re_ok ? '🔴 RE Requiem (ID:2067417) не промодерирован — не индексируется' : null,\n      pg.pending > 10000 ? `🔴 ${pg.pending.toLocaleString()} товаров ожидают модерацию` : null,\n    ].filter(Boolean)\n  },\n  strategy: {\n    updated_at: now,\n    revenue_yesterday: '€' + Number(ga.rev_yd).toFixed(0),\n    revenue_7d: '€' + Number(ga.rev_7d).toFixed(0),\n    revenue_30d: '€' + Number(ga.rev_30d).toFixed(0),\n    revenue_avg_day: '€' + ga.avg_day,\n    sessions_yesterday: ga.sess_yd,\n    conversions_yesterday: ga.conv_yd,\n    conv_rate_30d: ga.cr30 + '%',\n    stuck_fulfilled: pg.stuck,\n    completed_today: pg.comp_today,\n    completed_7d: pg.comp_7d,\n    completed_30d: pg.comp_30d,\n    orders_7d: pg.orders_7d,\n    alerts: [\n      pg.stuck > 300 ? `🔴 ${pg.stuck} заказов застряли в fulfilled — продавцы не получают деньги` : null,\n      pg.stuck > 50 && pg.stuck <= 300 ? `⚠️ ${pg.stuck} заказов в fulfilled` : null,\n      Number(ga.rev_yd) < (Number(ga.rev_30d)/30 * 0.5) && Number(ga.rev_30d) > 0 ?\n        `⚠️ Revenue вчера (€${Number(ga.rev_yd).toFixed(0)}) — ниже нормы на 50%+` : null,\n    ].filter(Boolean)\n  },\n  marketing: {\n    updated_at: now,\n    sessions_yesterday: ga.sess_yd,\n    sessions_7d: ga.sess_7d,\n    sessions_30d: ga.sess_30d,\n    conversions_30d: ga.conv_30d,\n    conv_rate_30d: ga.cr30 + '%',\n    revenue_30d: '€' + Number(ga.rev_30d).toFixed(0),\n    revenue_7d: '€' + Number(ga.rev_7d).toFixed(0),\n    orders_7d: pg.orders_7d,\n    top_queries: tq || 'нет данных',\n    alerts: [\n      parseFloat(ga.cr30) < 5 ? `⚠️ Конверсия ${ga.cr30}% — сильно ниже цели 8%` : null,\n      parseFloat(ga.cr30) >= 5 && parseFloat(ga.cr30) < 8 ? `📊 Конверсия ${ga.cr30}% — ниже цели 8%, есть потенциал` : null,\n    ].filter(Boolean)\n  },\n  product: {\n    updated_at: now,\n    active_listings: pg.active,\n    pending_moderation: pg.pending,\n    out_of_stock_visible: pg.oos,\n    stuck_fulfilled: pg.stuck,\n    completed_today: pg.comp_today,\n    orders_7d: pg.orders_7d,\n    orders_24h: pg.orders_24h,\n    new_reviews_7d: pg.reviews_7d,\n    re_requiem_moderated: pg.re_ok,\n    alerts: [\n      pg.pending > 10000 ? `🔴 ${pg.pending.toLocaleString()} товаров ждут модерацию — критично` : null,\n      pg.pending > 500 && pg.pending <= 10000 ? `⚠️ ${pg.pending.toLocaleString()} товаров на модерации` : null,\n      !pg.re_ok ? '🔴 RE Requiem (ID:2067417) не промодерирован' : null,\n      pg.stuck > 200 ? `⚠️ ${pg.stuck} заказов stuck в fulfilled` : null,\n    ].filter(Boolean)\n  }\n};\n\n// Return one item per manager for batch upsert\nreturn Object.entries(contexts).map(([id, data]) => ({\n  json: { manager_id: id, context_json: JSON.stringify(data) }\n}));\n"
+      },
+      "id": "code2",
+      "name": "🏗️ Build 4 Manager Contexts",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        720,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ai_manager_context (manager_id, context_data, updated_at) VALUES ('{{ $json.manager_id }}', '{{ $json.context_json }}'::jsonb, NOW()) ON CONFLICT (manager_id) DO UPDATE SET context_data = EXCLUDED.context_data, updated_at = NOW()",
+        "options": {}
+      },
+      "id": "pg2",
+      "name": "💾 PG: Save Contexts",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        960,
+        400
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst items = $input.all();\nconst updated = items.map(i => i.json.manager_id || 'ok').join(', ');\nreturn [{ json: { message: `✅ Обновлено: ${updated}`, count: items.length } }];\n"
+      },
+      "id": "code3",
+      "name": "📊 Aggregate",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "sendMessage",
+        "chatId": "83436260",
+        "text": "🤖 *WF-014: AI Manager контекст обновлён*\n\n📅 {{ $now.toFormat('dd.MM.yyyy HH:mm') }} UTC\n✅ 4 менеджера синхронизированы\n\n📊 *Источники:*\n• PostgreSQL — метрики каталога и заказов\n• GA4 — revenue и трафик (3 периода)\n• GSC — топ поисковые запросы\n\n_Следующее обновление через 24ч_",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg1",
+      "name": "📱 Telegram: Done",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        560
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "⏰ Schedule 06:00 UTC": {
+      "main": [
+        [
+          {
+            "node": "🗄️ PG: Business Metrics",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "🔑 GA4 + GSC Fetch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🗄️ PG: Business Metrics": {
+      "main": [
+        [
+          {
+            "node": "🔀 Merge PG + GA4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🔑 GA4 + GSC Fetch": {
+      "main": [
+        [
+          {
+            "node": "🔀 Merge PG + GA4",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "🔀 Merge PG + GA4": {
+      "main": [
+        [
+          {
+            "node": "🏗️ Build 4 Manager Contexts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🏗️ Build 4 Manager Contexts": {
+      "main": [
+        [
+          {
+            "node": "💾 PG: Save Contexts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "💾 PG: Save Contexts": {
+      "main": [
+        [
+          {
+            "node": "📊 Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "📊 Aggregate": {
+      "main": [
+        [
+          {
+            "node": "📱 Telegram: Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:⏰ Schedule 06:00 UTC": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "d1748e94-00c1-42e0-8e80-d4d5fd78c7b8",
+  "activeVersionId": "d1748e94-00c1-42e0-8e80-d4d5fd78c7b8",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T11:01:42.926Z",
+      "createdAt": "2026-03-01T11:01:42.926Z",
+      "role": "workflow:owner",
+      "workflowId": "BkvZZxZoyp9vSnrg",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-05T10:42:38.972Z",
+    "createdAt": "2026-03-05T10:42:38.972Z",
+    "versionId": "d1748e94-00c1-42e0-8e80-d4d5fd78c7b8",
+    "workflowId": "BkvZZxZoyp9vSnrg",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 6 * * *"
+              }
+            ]
+          }
+        },
+        "id": "sched1",
+        "name": "⏰ Schedule 06:00 UTC",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT \n  (SELECT COUNT(*) FROM marketplace WHERE moderated=true AND hidden=false)::int as active_listings,\n  (SELECT COUNT(*) FROM marketplace WHERE moderated=false AND hidden=false)::int as pending_moderation,\n  (SELECT COUNT(*) FROM marketplace WHERE quantity=0 AND hidden=false AND moderated=true)::int as out_of_stock_visible,\n  (SELECT COUNT(*) FROM marketplace_order WHERE status='fulfilled')::int as stuck_fulfilled,\n  (SELECT COUNT(*) FROM marketplace_order WHERE status='completed' AND created_at > NOW()-INTERVAL '30 days')::int as completed_30d,\n  (SELECT COUNT(*) FROM marketplace_order WHERE status='completed' AND created_at > NOW()-INTERVAL '7 days')::int as completed_7d,\n  (SELECT COUNT(*) FROM marketplace_order WHERE status='completed' AND created_at > NOW()-INTERVAL '24 hours')::int as completed_today,\n  (SELECT COUNT(*) FROM marketplace_order WHERE created_at > NOW()-INTERVAL '7 days')::int as orders_7d,\n  (SELECT COUNT(*) FROM marketplace_order WHERE created_at > NOW()-INTERVAL '24 hours')::int as orders_24h,\n  (SELECT COALESCE(moderated, false) FROM marketplace WHERE id=2067417 LIMIT 1) as re_requiem_moderated,\n  (SELECT COUNT(*) FROM marketplace_review WHERE created_at > NOW()-INTERVAL '7 days')::int as new_reviews_7d,\n  TO_CHAR(NOW(), 'DD.MM.YYYY HH24:MI') as checked_at",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "🗄️ PG: Business Metrics",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          240,
+          280
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "\n// Generate Google OAuth2 JWT token for GA4 + GSC\nconst crypto = require('crypto');\n\nconst serviceAccount = {\n  client_email: \"ga4-mcp@ru-gg-438811.iam.gserviceaccount.com\",\n  private_key: \"-----BEGIN PRIVATE KEY-----\\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC8U0mwWxcfKAzA\\nGIv7BJk3yB2eoa+ZU2i+fxZFh5D9qO8K6GPKPV1U9emdkFPI3Eb633XiMg8yIj1z\\nYLtLarV4EMw/doyrKJE0XNTzlU/hgvmvAz1n1L9pbSqc/8Ay9FrTKwdZij9qfkg7\\n1zNBQX8OG49wqkUxm2QV5Lgfr0V30saO3d8VkzG1OC9BAALriuI53IjrTUP7qfuT\\nq9yi/Fb88vZajtE5RzUGX52PVlrchACI2uMmZf8lEkCKWNulIGchxXZptHLg4etE\\nWLoQcPrt43SUhZkimAeOg2I0QTOGS/jmCWI1OWyAzzj+eOH8aP4n+RbIN4MBTJxD\\nIS02QypzAgMBAAECggEACuc38kKb1WOmtVQJsRTd+aZK3Lb+T4sbAQ7V9cMr1RvI\\no/uHYRtpzpqI/EsLJsTMd6E9yUSq4sHe7lHXFiTNijy17ovioggwiMHbjGZRIFYw\\nz+Q8OmMAjM4gTcQOClH7Li2k3v2Li8Ykg95pavZFSl/n6P1BEbNHuW+Rn2sw3O2y\\ncS4IvwTKnN1v8dA5WTeyKsNZye8HqpbFKYbDA1O1vopBvvtBADpwDDELKnZswn+5\\nVNBAmutRB+GFT2FwPYMO8K6g3nNhNvzXdhkXXIXDenanDp6ksHAvt2iwmSBQGwJB\\n/Lw0qeYTKa43dC/rmQvWq+RFz/gDYhvo2Wb4eOvVGQKBgQDxMJJvwKkJfFpg5ybo\\nVOHd4NxNXR+Z9uOh7/3ah69uHAZCwjlFtCf7AFwy/P4MafX+xLP+DEv7vviHP8nh\\nBKgkpbMnoD4g3tTyfEsGqNdNinz6cHln38zkLOJz9WMDlSTvbzIjEJITC0b2dP9Y\\nymLhtbuG+yekAZgOootEq0vN6QKBgQDH47Q2pZsWW+8LPSfE7tqAEA7sjKwrcAdf\\nubGFTw/Djss0LRPkOTkJEMg27hPIY/ZOYB2mfD3Q55yYYSThsYM/OtnKsIkepUT2\\nJ3qgYlKOuLTxYbpzzrT4gvAeiFJEQXGeP6ve2aibYv41PsfnJHJPmz7bW4JGnEaZ\\nzgSuhP6v+wKBgHVgZAOKyTjakclS9PZgSMOIKO5lgXmWU1V9zBbLra5yaQGYL/Mi\\nJ8rZdAVEZgZ4ksT3yXi7V0ceuyhm/MJLV+Dt2vBP5axthUi1AHYvOQh9ezEOB6dr\\nnPT2ewZfx134+U6k2MuDxvMJq/FJIvN9Gv4pSSf5lmMUe4GzzP8QNgXxAoGBALlp\\nN2JxHngQ8pykL112iOq8+nrkyVbJZa2fW1DiUyb8LvTI02igw4zrKiv5jhQU1QVC\\nFn61Q8mg7RpTEZjfxXRDLH3cXnQ0rND/MbnPOfD017IHCqIdHLRfEEfh/x0c7zzw\\npoXhs4neuxm8kESRBA9fW2Cxcxf4IWzNMn6HEo89AoGBAJisf2bG/OniOz7Wdy09\\nALAZDV1pS2rHewxiIzL4nqZhR8EbQSoFocJyd19NAT7ASy9iuSzc/x9U80B4Gv3A\\nJxiZ2l6+MLEfQHvLoNX7MxTsiuTtHnZY7jCqlcFlOaKJKiVrYYJFQriqi58HC95Y\\ntVHZjilwvVGvxfdc/eDXqGDB\\n-----END PRIVATE KEY-----\\n\"\n};\n\nfunction base64url(str) {\n  return Buffer.from(str).toString('base64')\n    .replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=/g, '');\n}\n\nconst now = Math.floor(Date.now() / 1000);\nconst header = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));\nconst payload = base64url(JSON.stringify({\n  iss: serviceAccount.client_email,\n  scope: 'https://www.googleapis.com/auth/analytics.readonly https://www.googleapis.com/auth/webmasters.readonly',\n  aud: 'https://oauth2.googleapis.com/token',\n  exp: now + 3600,\n  iat: now\n}));\n\nconst signInput = header + '.' + payload;\nconst sign = crypto.createSign('RSA-SHA256');\nsign.update(signInput);\nconst signature = sign.sign(serviceAccount.private_key.replace(/\\\\n/g, '\\n'), 'base64')\n  .replace(/\\+/g, '-').replace(/\\//g, '_').replace(/=/g, '');\nconst jwt = signInput + '.' + signature;\n\n// Exchange JWT for access token\nconst tokenResp = await $helpers.httpRequest({\n  method: 'POST',\n  url: 'https://oauth2.googleapis.com/token',\n  headers: { 'Content-Type': 'application/x-www-form-urlencoded' },\n  body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`\n});\n\nconst token = JSON.parse(tokenResp).access_token;\n\n// GA4 Report - 3 date ranges at once\nconst ga4Resp = await $helpers.httpRequest({\n  method: 'POST', \n  url: 'https://analyticsdata.googleapis.com/v1beta/properties/511167634:runReport',\n  headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    dateRanges: [\n      { startDate: 'yesterday', endDate: 'yesterday', name: 'yesterday' },\n      { startDate: '7daysAgo', endDate: 'today', name: 'last7d' },\n      { startDate: '30daysAgo', endDate: 'today', name: 'last30d' }\n    ],\n    metrics: [\n      { name: 'sessions' },\n      { name: 'conversions' },\n      { name: 'totalRevenue' }\n    ]\n  })\n});\nconst ga4 = JSON.parse(ga4Resp);\n\n// Parse GA4 rows\nconst hm = {};\n(ga4.metricHeaders || []).forEach((h, i) => hm[h.name] = i);\nlet sess_yd=0, conv_yd=0, rev_yd=0;\nlet sess_7d=0, conv_7d=0, rev_7d=0;\nlet sess_30d=0, conv_30d=0, rev_30d=0;\n\n(ga4.rows || []).forEach(r => {\n  const range = (r.dimensionValues || [{value:''}])[0].value;\n  const v = r.metricValues || [];\n  const get = k => parseFloat(v[hm[k]]?.value || 0);\n  if (range==='yesterday') { sess_yd=get('sessions'); conv_yd=get('conversions'); rev_yd=get('totalRevenue'); }\n  else if (range==='last7d') { sess_7d=get('sessions'); conv_7d=get('conversions'); rev_7d=get('totalRevenue'); }\n  else if (range==='last30d') { sess_30d=get('sessions'); conv_30d=get('conversions'); rev_30d=get('totalRevenue'); }\n});\n\n// GSC Top Queries\nconst gscResp = await $helpers.httpRequest({\n  method: 'POST',\n  url: 'https://www.googleapis.com/webmasters/v3/sites/sc-domain%3Agaming-goods.ru/searchAnalytics/query',\n  headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },\n  body: JSON.stringify({\n    startDate: new Date(Date.now() - 30*86400000).toISOString().slice(0,10),\n    endDate: new Date().toISOString().slice(0,10),\n    dimensions: ['query'],\n    rowLimit: 8\n  })\n});\nconst gsc = JSON.parse(gscResp);\nconst topQueries = (gsc.rows || []).slice(0,5).map(r => ({\n  q: r.keys[0],\n  clicks: r.clicks,\n  ctr: (r.ctr*100).toFixed(1)+'%',\n  pos: r.position.toFixed(1)\n}));\n\nconst avgRevDay = rev_30d > 0 ? (rev_30d/30).toFixed(0) : 0;\nconst cr30 = sess_30d > 0 ? (conv_30d/sess_30d*100).toFixed(1) : '0';\n\nreturn [{ json: {\n  token, // pass token forward for reuse\n  // GA4\n  sess_yd: Math.round(sess_yd), conv_yd: Math.round(conv_yd), rev_yd: rev_yd.toFixed(0),\n  sess_7d: Math.round(sess_7d), conv_7d: Math.round(conv_7d), rev_7d: rev_7d.toFixed(0),\n  sess_30d: Math.round(sess_30d), conv_30d: Math.round(conv_30d), rev_30d: rev_30d.toFixed(0),\n  avg_rev_day: avgRevDay,\n  cr30,\n  // GSC\n  top_queries: topQueries\n} }];\n"
+        },
+        "id": "code1",
+        "name": "🔑 GA4 + GSC Fetch",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          240,
+          520
+        ]
+      },
+      {
+        "parameters": {
+          "mode": "combineBySql",
+          "numberInputs": 2,
+          "query": "SELECT * FROM input1 JOIN input2 ON TRUE"
+        },
+        "id": "merge1",
+        "name": "🔀 Merge PG + GA4",
+        "type": "n8n-nodes-base.merge",
+        "typeVersion": 3,
+        "position": [
+          480,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst d = $input.item.json;\n\n// Helpers\nconst int = k => parseInt(d[k] || 0);\nconst str = k => String(d[k] || '');\nconst pct = (n, d2) => d2 > 0 ? (n/d2*100).toFixed(1)+'%' : '0%';\n\nconst pg = {\n  active: int('active_listings'),\n  pending: int('pending_moderation'),\n  oos: int('out_of_stock_visible'),\n  stuck: int('stuck_fulfilled'),\n  comp_today: int('completed_today'),\n  comp_7d: int('completed_7d'),\n  comp_30d: int('completed_30d'),\n  orders_7d: int('orders_7d'),\n  orders_24h: int('orders_24h'),\n  re_ok: d.re_requiem_moderated === true || d.re_requiem_moderated === 'true',\n  reviews_7d: int('new_reviews_7d'),\n  date: str('checked_at')\n};\n\nconst ga = {\n  sess_yd: int('sess_yd'), conv_yd: int('conv_yd'), rev_yd: str('rev_yd'),\n  sess_7d: int('sess_7d'), rev_7d: str('rev_7d'),\n  sess_30d: int('sess_30d'), conv_30d: int('conv_30d'), rev_30d: str('rev_30d'),\n  avg_day: str('avg_rev_day'), cr30: str('cr30')\n};\n\nconst tq = (d.top_queries || []).map(q => `${q.q}: ${q.clicks} кл, CTR ${q.ctr}, поз ${q.pos}`).join(' | ');\n\nconst now = new Date().toISOString();\n\n// Build 4 context objects\nconst contexts = {\n  seo: {\n    updated_at: now,\n    active_listings: pg.active,\n    out_of_stock_visible: pg.oos,\n    re_requiem_moderated: pg.re_ok,\n    sessions_7d: ga.sess_7d,\n    sessions_30d: ga.sess_30d,\n    conv_rate_30d: ga.cr30 + '%',\n    top_queries: tq || 'нет данных',\n    alerts: [\n      pg.oos > 5000 ? `🔴 ${pg.oos.toLocaleString()} OOS товаров видимы — thin content вредит индексации` : null,\n      pg.oos > 1000 && pg.oos <= 5000 ? `⚠️ ${pg.oos.toLocaleString()} OOS товаров видимы` : null,\n      !pg.re_ok ? '🔴 RE Requiem (ID:2067417) не промодерирован — не индексируется' : null,\n      pg.pending > 10000 ? `🔴 ${pg.pending.toLocaleString()} товаров ожидают модерацию` : null,\n    ].filter(Boolean)\n  },\n  strategy: {\n    updated_at: now,\n    revenue_yesterday: '€' + Number(ga.rev_yd).toFixed(0),\n    revenue_7d: '€' + Number(ga.rev_7d).toFixed(0),\n    revenue_30d: '€' + Number(ga.rev_30d).toFixed(0),\n    revenue_avg_day: '€' + ga.avg_day,\n    sessions_yesterday: ga.sess_yd,\n    conversions_yesterday: ga.conv_yd,\n    conv_rate_30d: ga.cr30 + '%',\n    stuck_fulfilled: pg.stuck,\n    completed_today: pg.comp_today,\n    completed_7d: pg.comp_7d,\n    completed_30d: pg.comp_30d,\n    orders_7d: pg.orders_7d,\n    alerts: [\n      pg.stuck > 300 ? `🔴 ${pg.stuck} заказов застряли в fulfilled — продавцы не получают деньги` : null,\n      pg.stuck > 50 && pg.stuck <= 300 ? `⚠️ ${pg.stuck} заказов в fulfilled` : null,\n      Number(ga.rev_yd) < (Number(ga.rev_30d)/30 * 0.5) && Number(ga.rev_30d) > 0 ?\n        `⚠️ Revenue вчера (€${Number(ga.rev_yd).toFixed(0)}) — ниже нормы на 50%+` : null,\n    ].filter(Boolean)\n  },\n  marketing: {\n    updated_at: now,\n    sessions_yesterday: ga.sess_yd,\n    sessions_7d: ga.sess_7d,\n    sessions_30d: ga.sess_30d,\n    conversions_30d: ga.conv_30d,\n    conv_rate_30d: ga.cr30 + '%',\n    revenue_30d: '€' + Number(ga.rev_30d).toFixed(0),\n    revenue_7d: '€' + Number(ga.rev_7d).toFixed(0),\n    orders_7d: pg.orders_7d,\n    top_queries: tq || 'нет данных',\n    alerts: [\n      parseFloat(ga.cr30) < 5 ? `⚠️ Конверсия ${ga.cr30}% — сильно ниже цели 8%` : null,\n      parseFloat(ga.cr30) >= 5 && parseFloat(ga.cr30) < 8 ? `📊 Конверсия ${ga.cr30}% — ниже цели 8%, есть потенциал` : null,\n    ].filter(Boolean)\n  },\n  product: {\n    updated_at: now,\n    active_listings: pg.active,\n    pending_moderation: pg.pending,\n    out_of_stock_visible: pg.oos,\n    stuck_fulfilled: pg.stuck,\n    completed_today: pg.comp_today,\n    orders_7d: pg.orders_7d,\n    orders_24h: pg.orders_24h,\n    new_reviews_7d: pg.reviews_7d,\n    re_requiem_moderated: pg.re_ok,\n    alerts: [\n      pg.pending > 10000 ? `🔴 ${pg.pending.toLocaleString()} товаров ждут модерацию — критично` : null,\n      pg.pending > 500 && pg.pending <= 10000 ? `⚠️ ${pg.pending.toLocaleString()} товаров на модерации` : null,\n      !pg.re_ok ? '🔴 RE Requiem (ID:2067417) не промодерирован' : null,\n      pg.stuck > 200 ? `⚠️ ${pg.stuck} заказов stuck в fulfilled` : null,\n    ].filter(Boolean)\n  }\n};\n\n// Return one item per manager for batch upsert\nreturn Object.entries(contexts).map(([id, data]) => ({\n  json: { manager_id: id, context_json: JSON.stringify(data) }\n}));\n"
+        },
+        "id": "code2",
+        "name": "🏗️ Build 4 Manager Contexts",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          720,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "INSERT INTO ai_manager_context (manager_id, context_data, updated_at) VALUES ('{{ $json.manager_id }}', '{{ $json.context_json }}'::jsonb, NOW()) ON CONFLICT (manager_id) DO UPDATE SET context_data = EXCLUDED.context_data, updated_at = NOW()",
+          "options": {}
+        },
+        "id": "pg2",
+        "name": "💾 PG: Save Contexts",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          960,
+          400
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst items = $input.all();\nconst updated = items.map(i => i.json.manager_id || 'ok').join(', ');\nreturn [{ json: { message: `✅ Обновлено: ${updated}`, count: items.length } }];\n"
+        },
+        "id": "code3",
+        "name": "📊 Aggregate",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1200,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "operation": "sendMessage",
+          "chatId": "83436260",
+          "text": "🤖 *WF-014: AI Manager контекст обновлён*\n\n📅 {{ $now.toFormat('dd.MM.yyyy HH:mm') }} UTC\n✅ 4 менеджера синхронизированы\n\n📊 *Источники:*\n• PostgreSQL — метрики каталога и заказов\n• GA4 — revenue и трафик (3 периода)\n• GSC — топ поисковые запросы\n\n_Следующее обновление через 24ч_",
+          "additionalFields": {
+            "parse_mode": "Markdown"
+          }
+        },
+        "id": "tg1",
+        "name": "📱 Telegram: Done",
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1200,
+          560
+        ],
+        "credentials": {
+          "telegramApi": {
+            "id": "IjoBfA5jgnMrU9qV",
+            "name": "GG Telegram Bot"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "⏰ Schedule 06:00 UTC": {
+        "main": [
+          [
+            {
+              "node": "🗄️ PG: Business Metrics",
+              "type": "main",
+              "index": 0
+            },
+            {
+              "node": "🔑 GA4 + GSC Fetch",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "🗄️ PG: Business Metrics": {
+        "main": [
+          [
+            {
+              "node": "🔀 Merge PG + GA4",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "🔑 GA4 + GSC Fetch": {
+        "main": [
+          [
+            {
+              "node": "🔀 Merge PG + GA4",
+              "type": "main",
+              "index": 1
+            }
+          ]
+        ]
+      },
+      "🔀 Merge PG + GA4": {
+        "main": [
+          [
+            {
+              "node": "🏗️ Build 4 Manager Contexts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "🏗️ Build 4 Manager Contexts": {
+        "main": [
+          [
+            {
+              "node": "💾 PG: Save Contexts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "💾 PG: Save Contexts": {
+        "main": [
+          [
+            {
+              "node": "📊 Aggregate",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "📊 Aggregate": {
+        "main": [
+          [
+            {
+              "node": "📱 Telegram: Done",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
