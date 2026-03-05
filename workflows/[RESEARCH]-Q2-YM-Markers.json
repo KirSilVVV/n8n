@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T14:30:31.994Z",
+  "createdAt": "2026-03-01T14:30:31.994Z",
+  "id": "qjZaogSL6l2jDH0R",
+  "name": "[RESEARCH] Q2 YM Markers",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "research-q2-ym-001",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "research-q2-ym-001"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT\n  CASE\n    WHEN external_order_id IS NULL THEN 'NULL'\n    WHEN external_order_id = 'VIRTUAL' THEN 'VIRTUAL'\n    WHEN external_order_id LIKE 'KINGUIN_%' THEN 'KINGUIN_xxx'\n    WHEN external_order_id LIKE 'YM_%' THEN 'YM_xxx'\n    WHEN external_order_id LIKE 'FRAGSTORE_%' THEN 'FRAGSTORE_xxx'\n    ELSE 'OTHER: ' || LEFT(external_order_id, 30)\n  END as pattern,\n  COUNT(*) as cnt\nFROM marketplace_order\nWHERE created_at > NOW() - INTERVAL '90 days'\nGROUP BY 1 ORDER BY cnt DESC\n",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "Query",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "fb97590c-19cd-4b9f-b059-b5ba3b080bab",
+  "activeVersionId": "fb97590c-19cd-4b9f-b059-b5ba3b080bab",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:30:31.994Z",
+      "createdAt": "2026-03-01T14:30:31.994Z",
+      "role": "workflow:owner",
+      "workflowId": "qjZaogSL6l2jDH0R",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T14:30:32.021Z",
+    "createdAt": "2026-03-01T14:30:32.021Z",
+    "versionId": "fb97590c-19cd-4b9f-b059-b5ba3b080bab",
+    "workflowId": "qjZaogSL6l2jDH0R",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "research-q2-ym-001",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "wh1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "research-q2-ym-001"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "\nSELECT\n  CASE\n    WHEN external_order_id IS NULL THEN 'NULL'\n    WHEN external_order_id = 'VIRTUAL' THEN 'VIRTUAL'\n    WHEN external_order_id LIKE 'KINGUIN_%' THEN 'KINGUIN_xxx'\n    WHEN external_order_id LIKE 'YM_%' THEN 'YM_xxx'\n    WHEN external_order_id LIKE 'FRAGSTORE_%' THEN 'FRAGSTORE_xxx'\n    ELSE 'OTHER: ' || LEFT(external_order_id, 30)\n  END as pattern,\n  COUNT(*) as cnt\nFROM marketplace_order\nWHERE created_at > NOW() - INTERVAL '90 days'\nGROUP BY 1 ORDER BY cnt DESC\n",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "Query",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          480,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Query",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
