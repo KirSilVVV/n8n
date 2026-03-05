@@ -1,0 +1,193 @@
+{
+  "updatedAt": "2026-03-01T10:53:11.607Z",
+  "createdAt": "2026-03-01T10:53:11.607Z",
+  "id": "h4xzLhMFoq044JIm",
+  "name": "[API] WF-015 Get Manager Context",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "manager-context",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh1",
+      "name": "Webhook GET",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        300
+      ],
+      "webhookId": "manager-context"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT manager_id, context_data, updated_at FROM ai_manager_context ORDER BY manager_id",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "PG: Fetch All Contexts",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        220,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst rows = $input.all();\nconst result = {};\nrows.forEach(item => {\n  const { manager_id, context_data, updated_at } = item.json;\n  result[manager_id] = { ...context_data, updated_at };\n});\nreturn [{ json: result }];\n"
+      },
+      "id": "c1",
+      "name": "Code: Format Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook GET": {
+      "main": [
+        [
+          {
+            "node": "PG: Fetch All Contexts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG: Fetch All Contexts": {
+      "main": [
+        [
+          {
+            "node": "Code: Format Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "92fe91d5-454b-4891-b95a-7d3b293f1737",
+  "activeVersionId": "92fe91d5-454b-4891-b95a-7d3b293f1737",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T10:53:11.607Z",
+      "createdAt": "2026-03-01T10:53:11.607Z",
+      "role": "workflow:owner",
+      "workflowId": "h4xzLhMFoq044JIm",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T10:53:11.640Z",
+    "createdAt": "2026-03-01T10:53:11.640Z",
+    "versionId": "92fe91d5-454b-4891-b95a-7d3b293f1737",
+    "workflowId": "h4xzLhMFoq044JIm",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "manager-context",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "wh1",
+        "name": "Webhook GET",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          300
+        ],
+        "webhookId": "manager-context"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT manager_id, context_data, updated_at FROM ai_manager_context ORDER BY manager_id",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "PG: Fetch All Contexts",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          220,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst rows = $input.all();\nconst result = {};\nrows.forEach(item => {\n  const { manager_id, context_data, updated_at } = item.json;\n  result[manager_id] = { ...context_data, updated_at };\n});\nreturn [{ json: result }];\n"
+        },
+        "id": "c1",
+        "name": "Code: Format Response",
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          440,
+          300
+        ]
+      }
+    ],
+    "connections": {
+      "Webhook GET": {
+        "main": [
+          [
+            {
+              "node": "PG: Fetch All Contexts",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "PG: Fetch All Contexts": {
+        "main": [
+          [
+            {
+              "node": "Code: Format Response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
