@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T14:31:33.678Z",
+  "createdAt": "2026-03-01T14:31:33.678Z",
+  "id": "uzElvf1uH0nbYtCq",
+  "name": "[R] Revenue yesterday",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "research-rev-yesterday",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "research-rev-yesterday"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nWITH rate AS (\n  SELECT exchange_rate, ROUND(1.0/exchange_rate, 2) as rub_per_eur\n  FROM currency WHERE code = 'RUB'\n),\norders AS (\n  SELECT\n    mo.id,\n    (mo.content->>'total')::numeric / 100 as total_eur,\n    mo.content->'items'->0->>'brand' as brand,\n    mo.content->'items'->0->>'title' as title,\n    mo.external_order_id,\n    mo.status\n  FROM marketplace_order mo\n  WHERE mo.status IN ('completed','completed_with_review')\n    AND DATE(mo.updated_at) = CURRENT_DATE - 1\n)\nSELECT\n  CASE WHEN brand = 'Nutaku' THEN 'Nutaku' ELSE 'Other' END as segment,\n  COUNT(*) as orders,\n  ROUND(SUM(total_eur), 2) as revenue_eur,\n  ROUND(SUM(total_eur / r.exchange_rate), 0) as revenue_rub,\n  r.rub_per_eur as rate\nFROM orders, rate r\nGROUP BY 1, r.rub_per_eur, r.exchange_rate\nORDER BY 1\n",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "Query",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "803c0f6b-0d9b-402f-92e2-b4dfc505c839",
+  "activeVersionId": "803c0f6b-0d9b-402f-92e2-b4dfc505c839",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:31:33.678Z",
+      "createdAt": "2026-03-01T14:31:33.678Z",
+      "role": "workflow:owner",
+      "workflowId": "uzElvf1uH0nbYtCq",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T14:31:33.699Z",
+    "createdAt": "2026-03-01T14:31:33.699Z",
+    "versionId": "803c0f6b-0d9b-402f-92e2-b4dfc505c839",
+    "workflowId": "uzElvf1uH0nbYtCq",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "research-rev-yesterday",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "wh1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "research-rev-yesterday"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "\nWITH rate AS (\n  SELECT exchange_rate, ROUND(1.0/exchange_rate, 2) as rub_per_eur\n  FROM currency WHERE code = 'RUB'\n),\norders AS (\n  SELECT\n    mo.id,\n    (mo.content->>'total')::numeric / 100 as total_eur,\n    mo.content->'items'->0->>'brand' as brand,\n    mo.content->'items'->0->>'title' as title,\n    mo.external_order_id,\n    mo.status\n  FROM marketplace_order mo\n  WHERE mo.status IN ('completed','completed_with_review')\n    AND DATE(mo.updated_at) = CURRENT_DATE - 1\n)\nSELECT\n  CASE WHEN brand = 'Nutaku' THEN 'Nutaku' ELSE 'Other' END as segment,\n  COUNT(*) as orders,\n  ROUND(SUM(total_eur), 2) as revenue_eur,\n  ROUND(SUM(total_eur / r.exchange_rate), 0) as revenue_rub,\n  r.rub_per_eur as rate\nFROM orders, rate r\nGROUP BY 1, r.rub_per_eur, r.exchange_rate\nORDER BY 1\n",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "Query",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          480,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Query",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
