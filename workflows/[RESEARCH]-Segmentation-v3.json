@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T14:27:35.165Z",
+  "createdAt": "2026-03-01T14:27:35.165Z",
+  "id": "OqTLWLiLxbhb7e5u",
+  "name": "[RESEARCH] Segmentation v3",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "research-seg-002",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "research-seg-002"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT json_build_object(\n  'q1_nutaku_brands', (\n    SELECT json_agg(row_to_json(t)) FROM (\n      SELECT brand, COUNT(*) as cnt FROM marketplace\n      WHERE LOWER(brand) LIKE '%nutaku%' OR LOWER(title) LIKE '%nutaku%'\n      GROUP BY brand ORDER BY cnt DESC LIMIT 10\n    ) t\n  ),\n  'q2_external_order_id_patterns', (\n    SELECT json_agg(row_to_json(t)) FROM (\n      SELECT \n        CASE \n          WHEN external_order_id IS NULL THEN 'NULL'\n          WHEN external_order_id = 'VIRTUAL' THEN 'VIRTUAL'\n          WHEN external_order_id LIKE 'KINGUIN_%' THEN 'KINGUIN_xxx'\n          WHEN external_order_id LIKE 'YM_%' THEN 'YM_xxx'\n          WHEN external_order_id LIKE 'FRAGSTORE_%' THEN 'FRAGSTORE_xxx'\n          ELSE LEFT(external_order_id, 20)\n        END as pattern,\n        COUNT(*) as cnt\n      FROM marketplace_order\n      WHERE created_at > NOW() - INTERVAL '60 days'\n      GROUP BY 1 ORDER BY cnt DESC LIMIT 15\n    ) t\n  ),\n  'q3_order_data_keys', (\n    SELECT json_agg(row_to_json(t)) FROM (\n      SELECT key, COUNT(*) as cnt\n      FROM marketplace_order, jsonb_object_keys(order_data) as key\n      WHERE created_at > NOW() - INTERVAL '30 days'\n      GROUP BY key ORDER BY cnt DESC LIMIT 20\n    ) t\n  ),\n  'q4_content_structure', (\n    SELECT json_agg(row_to_json(t)) FROM (\n      SELECT \n        content->'items'->0->>'brand' as brand,\n        content->'items'->0->>'title' as title,\n        content->'items'->0->>'id' as product_id,\n        order_data->>'productId' as order_data_product_id,\n        external_order_id,\n        status\n      FROM marketplace_order\n      WHERE status IN ('completed','completed_with_review')\n        AND created_at > NOW() - INTERVAL '14 days'\n      LIMIT 5\n    ) t\n  ),\n  'q5_nutaku_orders_yesterday', (\n    SELECT json_build_object(\n      'count', COUNT(*),\n      'revenue_eur', ROUND(SUM((content->>'total')::numeric/100), 2)\n    )\n    FROM marketplace_order mo\n    WHERE status IN ('completed','completed_with_review')\n      AND DATE(updated_at) = CURRENT_DATE - 1\n      AND EXISTS (\n        SELECT 1 FROM marketplace m \n        WHERE m.id = (content->'items'->0->>'id')::int\n          AND LOWER(m.brand) LIKE '%nutaku%'\n      )\n  )\n) as result\n",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "All Research Queries",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "All Research Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "97dae0de-678e-4353-81cf-a49997070c19",
+  "activeVersionId": "97dae0de-678e-4353-81cf-a49997070c19",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:27:35.165Z",
+      "createdAt": "2026-03-01T14:27:35.165Z",
+      "role": "workflow:owner",
+      "workflowId": "OqTLWLiLxbhb7e5u",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T14:27:35.230Z",
+    "createdAt": "2026-03-01T14:27:35.230Z",
+    "versionId": "97dae0de-678e-4353-81cf-a49997070c19",
+    "workflowId": "OqTLWLiLxbhb7e5u",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "research-seg-002",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "wh1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "research-seg-002"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "\nSELECT json_build_object(\n  'q1_nutaku_brands', (\n    SELECT json_agg(row_to_json(t)) FROM (\n      SELECT brand, COUNT(*) as cnt FROM marketplace\n      WHERE LOWER(brand) LIKE '%nutaku%' OR LOWER(title) LIKE '%nutaku%'\n      GROUP BY brand ORDER BY cnt DESC LIMIT 10\n    ) t\n  ),\n  'q2_external_order_id_patterns', (\n    SELECT json_agg(row_to_json(t)) FROM (\n      SELECT \n        CASE \n          WHEN external_order_id IS NULL THEN 'NULL'\n          WHEN external_order_id = 'VIRTUAL' THEN 'VIRTUAL'\n          WHEN external_order_id LIKE 'KINGUIN_%' THEN 'KINGUIN_xxx'\n          WHEN external_order_id LIKE 'YM_%' THEN 'YM_xxx'\n          WHEN external_order_id LIKE 'FRAGSTORE_%' THEN 'FRAGSTORE_xxx'\n          ELSE LEFT(external_order_id, 20)\n        END as pattern,\n        COUNT(*) as cnt\n      FROM marketplace_order\n      WHERE created_at > NOW() - INTERVAL '60 days'\n      GROUP BY 1 ORDER BY cnt DESC LIMIT 15\n    ) t\n  ),\n  'q3_order_data_keys', (\n    SELECT json_agg(row_to_json(t)) FROM (\n      SELECT key, COUNT(*) as cnt\n      FROM marketplace_order, jsonb_object_keys(order_data) as key\n      WHERE created_at > NOW() - INTERVAL '30 days'\n      GROUP BY key ORDER BY cnt DESC LIMIT 20\n    ) t\n  ),\n  'q4_content_structure', (\n    SELECT json_agg(row_to_json(t)) FROM (\n      SELECT \n        content->'items'->0->>'brand' as brand,\n        content->'items'->0->>'title' as title,\n        content->'items'->0->>'id' as product_id,\n        order_data->>'productId' as order_data_product_id,\n        external_order_id,\n        status\n      FROM marketplace_order\n      WHERE status IN ('completed','completed_with_review')\n        AND created_at > NOW() - INTERVAL '14 days'\n      LIMIT 5\n    ) t\n  ),\n  'q5_nutaku_orders_yesterday', (\n    SELECT json_build_object(\n      'count', COUNT(*),\n      'revenue_eur', ROUND(SUM((content->>'total')::numeric/100), 2)\n    )\n    FROM marketplace_order mo\n    WHERE status IN ('completed','completed_with_review')\n      AND DATE(updated_at) = CURRENT_DATE - 1\n      AND EXISTS (\n        SELECT 1 FROM marketplace m \n        WHERE m.id = (content->'items'->0->>'id')::int\n          AND LOWER(m.brand) LIKE '%nutaku%'\n      )\n  )\n) as result\n",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "All Research Queries",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          480,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "All Research Queries",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
