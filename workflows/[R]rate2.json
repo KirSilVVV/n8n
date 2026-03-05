@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T14:33:40.462Z",
+  "createdAt": "2026-03-01T14:33:40.462Z",
+  "id": "uCb9KwomfLehhk5n",
+  "name": "[R]rate2",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "rk-rate-002",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "w",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "rk-rate-002"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT code, exchange_rate, ROUND(1.0/exchange_rate,2) as rub_per_eur FROM currency WHERE code='RUB'",
+        "options": {}
+      },
+      "id": "p",
+      "name": "Q",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Q",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "c4bfef03-4915-4682-b6dd-6a0554460eed",
+  "activeVersionId": "c4bfef03-4915-4682-b6dd-6a0554460eed",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:33:40.462Z",
+      "createdAt": "2026-03-01T14:33:40.462Z",
+      "role": "workflow:owner",
+      "workflowId": "uCb9KwomfLehhk5n",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T14:33:40.468Z",
+    "createdAt": "2026-03-01T14:33:40.468Z",
+    "versionId": "c4bfef03-4915-4682-b6dd-6a0554460eed",
+    "workflowId": "uCb9KwomfLehhk5n",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "rk-rate-002",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "w",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "rk-rate-002"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT code, exchange_rate, ROUND(1.0/exchange_rate,2) as rub_per_eur FROM currency WHERE code='RUB'",
+          "options": {}
+        },
+        "id": "p",
+        "name": "Q",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          480,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Q",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
