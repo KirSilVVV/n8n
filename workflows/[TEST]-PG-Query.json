@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T10:59:54.126Z",
+  "createdAt": "2026-03-01T09:40:44.558Z",
+  "id": "GvQ1CVxAHzgUZUMq",
+  "name": "[TEST] PG Query",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "pg-test-v2",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "pg-test-v2"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT manager_id, updated_at, jsonb_object_keys(context_data) as keys FROM ai_manager_context ORDER BY manager_id",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "PG",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        200,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "PG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "c7220fe7-9308-4f77-8055-196a45e2f54a",
+  "activeVersionId": "c7220fe7-9308-4f77-8055-196a45e2f54a",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T09:40:44.558Z",
+      "createdAt": "2026-03-01T09:40:44.558Z",
+      "role": "workflow:owner",
+      "workflowId": "GvQ1CVxAHzgUZUMq",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T10:59:54.126Z",
+    "createdAt": "2026-03-01T10:59:54.126Z",
+    "versionId": "c7220fe7-9308-4f77-8055-196a45e2f54a",
+    "workflowId": "GvQ1CVxAHzgUZUMq",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "pg-test-v2",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "wh1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          0
+        ],
+        "webhookId": "pg-test-v2"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "SELECT manager_id, updated_at, jsonb_object_keys(context_data) as keys FROM ai_manager_context ORDER BY manager_id",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "PG",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.6,
+        "position": [
+          200,
+          0
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "PG",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
