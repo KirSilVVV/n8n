@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T14:30:40.291Z",
+  "createdAt": "2026-03-01T14:30:40.291Z",
+  "id": "HRHfpzx2TQg2KQ4w",
+  "name": "[RESEARCH] Q3 Order Link",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "research-q3-link-001",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "research-q3-link-001"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT\n  order_data->>'productId' as od_product_id,\n  content->'items'->0->>'id' as content_item_id,\n  content->'items'->0->>'brand' as content_brand,\n  LEFT(content->'items'->0->>'title', 50) as content_title,\n  status,\n  external_order_id\nFROM marketplace_order\nWHERE status IN ('completed','completed_with_review')\n  AND created_at > NOW() - INTERVAL '14 days'\nLIMIT 8\n",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "Query",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "408d6311-19ad-4530-bc4e-cb9c9ff3ec7d",
+  "activeVersionId": "408d6311-19ad-4530-bc4e-cb9c9ff3ec7d",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:30:40.291Z",
+      "createdAt": "2026-03-01T14:30:40.291Z",
+      "role": "workflow:owner",
+      "workflowId": "HRHfpzx2TQg2KQ4w",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T14:30:40.299Z",
+    "createdAt": "2026-03-01T14:30:40.299Z",
+    "versionId": "408d6311-19ad-4530-bc4e-cb9c9ff3ec7d",
+    "workflowId": "HRHfpzx2TQg2KQ4w",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "research-q3-link-001",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "wh1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "research-q3-link-001"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "\nSELECT\n  order_data->>'productId' as od_product_id,\n  content->'items'->0->>'id' as content_item_id,\n  content->'items'->0->>'brand' as content_brand,\n  LEFT(content->'items'->0->>'title', 50) as content_title,\n  status,\n  external_order_id\nFROM marketplace_order\nWHERE status IN ('completed','completed_with_review')\n  AND created_at > NOW() - INTERVAL '14 days'\nLIMIT 8\n",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "Query",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          480,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Query",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
