@@ -134,7 +134,7 @@
       },
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE page_seo SET\n  description='{{ $json.description }}',\n  h1='{{ $json.h1 }}',\n  faq=CASE \n    WHEN '{{ $json.faq }}' != '' AND '{{ $json.faq }}' != '[]'\n    THEN '{{ $json.faq }}'::jsonb\n    ELSE faq\n  END,\n  updated_at=now()\nWHERE url='{{ $json.url }}' AND lang='ru'\n  AND '{{ $json.ok }}' = 'true'\nRETURNING id::text, url",
+        "query": "UPDATE page_seo SET\n  title='{{ $json.title }}',\n  description='{{ $json.description }}',\n  h1='{{ $json.h1 }}',\n  article=CASE\n    WHEN '{{ $json.article }}' != '' AND '{{ $json.article }}' != 'null'\n    THEN '{{ $json.article }}'\n    ELSE article\n  END,\n  faq=CASE \n    WHEN '{{ $json.faq }}' != '' AND '{{ $json.faq }}' != '[]'\n    THEN '{{ $json.faq }}'::jsonb\n    ELSE faq\n  END,\n  updated_at=now()\nWHERE url='{{ $json.url }}' AND lang='ru'\n  AND '{{ $json.ok }}' = 'true'\nRETURNING id::text, url",
         "options": {
           "connectionTimeoutMillis": 15000
         }
