@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-04-15T22:17:46.400Z",
+  "updatedAt": "2026-04-15T22:20:10.486Z",
   "createdAt": "2026-03-17T11:40:23.243Z",
   "id": "xPhhEHGFbGHjfZN7",
   "name": "WF-301 SEO Content Generator",
@@ -176,6 +176,21 @@
           "appendAttribution": false
         }
       }
+    },
+    {
+      "id": "webhook-manual",
+      "name": "Webhook: Manual Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        160
+      ],
+      "parameters": {
+        "path": "wf301-manual",
+        "responseMode": "onReceived",
+        "responseData": "allEntries"
+      }
     }
   ],
   "connections": {
@@ -183,14 +198,14 @@
       "main": [
         [
           {
-            "node": "PG: Pages without description",
+            "node": "PG: Pages without article or faq",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "PG: Pages without description": {
+    "PG: Pages without article or faq": {
       "main": [
         [
           {
@@ -244,6 +259,17 @@
           }
         ]
       ]
+    },
+    "Webhook: Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "PG: Pages without article or faq",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -265,9 +291,9 @@
   },
   "meta": null,
   "pinData": null,
-  "versionId": "72ebbd5a-fafc-4613-a26c-9da0dc1474b4",
-  "activeVersionId": "72ebbd5a-fafc-4613-a26c-9da0dc1474b4",
-  "versionCounter": 98,
+  "versionId": "cfc35dc9-000d-42d6-baed-9301d51b4ac5",
+  "activeVersionId": "cfc35dc9-000d-42d6-baed-9301d51b4ac5",
+  "versionCounter": 103,
   "triggerCount": 1,
   "shared": [
     {
@@ -290,9 +316,9 @@
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-04-15T22:17:46.400Z",
-    "createdAt": "2026-04-15T22:17:46.400Z",
-    "versionId": "72ebbd5a-fafc-4613-a26c-9da0dc1474b4",
+    "updatedAt": "2026-04-15T22:20:10.486Z",
+    "createdAt": "2026-04-15T22:20:10.486Z",
+    "versionId": "cfc35dc9-000d-42d6-baed-9301d51b4ac5",
     "workflowId": "xPhhEHGFbGHjfZN7",
     "nodes": [
       {
@@ -318,7 +344,7 @@
       },
       {
         "id": "pg",
-        "name": "PG: Pages without description",
+        "name": "PG: Pages without article or faq",
         "type": "n8n-nodes-base.postgres",
         "typeVersion": 2.6,
         "position": [
@@ -333,7 +359,7 @@
         },
         "parameters": {
           "operation": "executeQuery",
-          "query": "SELECT ps.url, ps.title,\n  TRIM(split_part(split_part(coalesce(ps.title,''),' купить',1),' |',1)) as brand,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 'Gift Card'\n       WHEN ps.url LIKE '%-currency' THEN 'Currency'\n       WHEN ps.url LIKE '%-game-keys' THEN 'Game Keys'\n       WHEN ps.url LIKE '%-accounts' THEN 'Accounts'\n       WHEN ps.url LIKE '%-subscription' THEN 'Subscription'\n       ELSE 'Other' END as category\nFROM page_seo ps\nWHERE ps.lang='ru' AND ps.url LIKE '%/t/%'\n  AND (ps.description IS NULL OR length(ps.description)=0)\n  AND length(coalesce(ps.title,''))>5\n  AND ps.title ~ '^[a-zA-Zа-яА-Я0-9]'\nORDER BY\n  -- 1. Топ бренды по объёму продаж и трафику\n  CASE\n    WHEN ps.url LIKE '%nutaku%'          THEN 1\n    WHEN ps.url LIKE '%telegram-star%'   THEN 2\n    WHEN ps.url LIKE '%steam-top-up%'    THEN 3\n    WHEN ps.url LIKE '%steam-wallet%'    THEN 4\n    WHEN ps.url LIKE '%roblox%'          THEN 5\n    WHEN ps.url LIKE '%minecraft%'       THEN 6\n    WHEN ps.url LIKE '%pubg%'            THEN 7\n    WHEN ps.url LIKE '%genshin%'         THEN 8\n    WHEN ps.url LIKE '%xbox%'            THEN 9\n    WHEN ps.url LIKE '%playstation%'     THEN 10\n    WHEN ps.url LIKE '%nintendo%'        THEN 11\n    WHEN ps.url LIKE '%spotify%'         THEN 12\n    WHEN ps.url LIKE '%discord%'         THEN 13\n    WHEN ps.url LIKE '%chatgpt%'         THEN 14\n    WHEN ps.url LIKE '%valorant%'        THEN 15\n    WHEN ps.url LIKE '%mobile-legends%'  THEN 16\n    WHEN ps.url LIKE '%fortnite%'        THEN 17\n    WHEN ps.url LIKE '%warframe%'        THEN 18\n    WHEN ps.url LIKE '%call-of-duty%'    THEN 19\n    WHEN ps.url LIKE '%ea-sport%'        THEN 20\n    -- 2. По категории\n    WHEN ps.url LIKE '%-currency'        THEN 50\n    WHEN ps.url LIKE '%-gift-card'       THEN 60\n    WHEN ps.url LIKE '%-game-keys'       THEN 70\n    WHEN ps.url LIKE '%-subscription'    THEN 80\n    ELSE 100\n  END,\n  -- 3. Внутри категории — по алфавиту (стабильный порядок)\n  ps.url\nLIMIT 890",
+          "query": "SELECT ps.url, ps.title,\n  TRIM(split_part(split_part(coalesce(ps.title,''),' купить',1),' |',1)) as brand,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 'Gift Card'\n       WHEN ps.url LIKE '%-currency' THEN 'Currency'\n       WHEN ps.url LIKE '%-game-keys' THEN 'Game Keys'\n       WHEN ps.url LIKE '%-accounts' THEN 'Accounts'\n       WHEN ps.url LIKE '%-subscription' THEN 'Subscription'\n       ELSE 'Other' END as category\nFROM page_seo ps\nWHERE ps.lang='ru' AND ps.url LIKE '%/t/%'\n  AND ps.title IS NOT NULL AND length(ps.title)>5\n  AND (\n    ps.article IS NULL OR length(ps.article)=0\n    OR ps.faq IS NULL OR jsonb_array_length(ps.faq) < 3\n  )\nORDER BY\n  CASE\n    WHEN ps.url LIKE '%nutaku%'          THEN 1\n    WHEN ps.url LIKE '%telegram-star%'   THEN 2\n    WHEN ps.url LIKE '%steam-top-up%'    THEN 3\n    WHEN ps.url LIKE '%steam-wallet%'    THEN 4\n    WHEN ps.url LIKE '%roblox%'          THEN 5\n    WHEN ps.url LIKE '%minecraft%'       THEN 6\n    WHEN ps.url LIKE '%pubg%'            THEN 7\n    WHEN ps.url LIKE '%genshin%'         THEN 8\n    WHEN ps.url LIKE '%xbox%'            THEN 9\n    WHEN ps.url LIKE '%playstation%'     THEN 10\n    WHEN ps.url LIKE '%nintendo%'        THEN 11\n    WHEN ps.url LIKE '%spotify%'         THEN 12\n    WHEN ps.url LIKE '%discord%'         THEN 13\n    WHEN ps.url LIKE '%chatgpt%'         THEN 14\n    WHEN ps.url LIKE '%valorant%'        THEN 15\n    ELSE 99\n  END,\n  CASE\n    WHEN ps.url LIKE '%-gift-card' THEN 1\n    WHEN ps.url LIKE '%-currency'  THEN 2\n    WHEN ps.url LIKE '%-game-keys' THEN 3\n    WHEN ps.url LIKE '%-subscription' THEN 4\n    ELSE 5\n  END,\n  ps.url\nLIMIT 1000",
           "options": {
             "connectionTimeoutMillis": 30000
           }
@@ -402,7 +428,7 @@
         ],
         "parameters": {
           "mode": "runOnceForAllItems",
-          "jsCode": "\nconst claudeItems = $input.all();\nconst pgItems = $('PG: Pages without description').all();\nconst results = [];\n\nfor (let i = 0; i < claudeItems.length; i++) {\n  const resp = claudeItems[i].json;\n  const pg = pgItems[i] ? pgItems[i].json : {};\n  const url = pg.url || '';\n\n  if (resp.error) {\n    results.push({ json: { ok: 'false', url, error: (resp.error.message||'api error').slice(0,80) } });\n    continue;\n  }\n\n  try {\n    let text = (resp.content || [])[0]?.text || '';\n    text = text.replace(/```json\\n?/gi,'').replace(/```\\n?/g,'').trim();\n    const d = JSON.parse(text);\n\n    // Escape single quotes for PostgreSQL\n    const esc = s => (s || '').replace(/'/g, \"''\").trim();\n\n    // Validate FAQ format: must be [{question, answer}, ...]\n    let faqJson = '[]';\n    if (Array.isArray(d.faq) && d.faq.length >= 3) {\n      const validFaq = d.faq\n        .filter(f => f.question && f.answer)\n        .map(f => ({ question: esc(f.question), answer: esc(f.answer) }));\n      if (validFaq.length >= 3) {\n        faqJson = JSON.stringify(validFaq);\n      }\n    }\n\n    // Validate lengths\n    const title = esc(d.title || '');\n    const description = esc(d.description || '');\n    const h1 = esc(d.h1 || '');\n    const article = esc(d.article || '');\n    const keywords = esc(d.keywords || '');\n\n    const ok = title.length >= 30 && description.length >= 100 ? 'true' : 'false';\n\n    results.push({ json: {\n      ok,\n      url,\n      title,\n      description,\n      h1,\n      article,\n      faq: faqJson,\n      keywords,\n      title_len: title.length,\n      desc_len: description.length,\n      article_len: article.length,\n      faq_count: d.faq ? d.faq.length : 0\n    }});\n\n  } catch(e) {\n    results.push({ json: { ok: 'false', url, error: ('parse_error: ' + e.message).slice(0,80) } });\n  }\n}\n\nreturn results;\n"
+          "jsCode": "\nconst claudeItems = $input.all();\nconst pgItems = $('PG: Pages without article or faq').all();\nconst results = [];\n\nfor (let i = 0; i < claudeItems.length; i++) {\n  const resp = claudeItems[i].json;\n  const pg = pgItems[i] ? pgItems[i].json : {};\n  const url = pg.url || '';\n\n  if (resp.error) {\n    results.push({ json: { ok: 'false', url, error: (resp.error.message||'api error').slice(0,80) } });\n    continue;\n  }\n\n  try {\n    let text = (resp.content || [])[0]?.text || '';\n    text = text.replace(/```json\\n?/gi,'').replace(/```\\n?/g,'').trim();\n    const d = JSON.parse(text);\n\n    // Escape single quotes for PostgreSQL\n    const esc = s => (s || '').replace(/'/g, \"''\").trim();\n\n    // Validate FAQ format: must be [{question, answer}, ...]\n    let faqJson = '[]';\n    if (Array.isArray(d.faq) && d.faq.length >= 3) {\n      const validFaq = d.faq\n        .filter(f => f.question && f.answer)\n        .map(f => ({ question: esc(f.question), answer: esc(f.answer) }));\n      if (validFaq.length >= 3) {\n        faqJson = JSON.stringify(validFaq);\n      }\n    }\n\n    // Validate lengths\n    const title = esc(d.title || '');\n    const description = esc(d.description || '');\n    const h1 = esc(d.h1 || '');\n    const article = esc(d.article || '');\n    const keywords = esc(d.keywords || '');\n\n    const ok = title.length >= 30 && description.length >= 100 ? 'true' : 'false';\n\n    results.push({ json: {\n      ok,\n      url,\n      title,\n      description,\n      h1,\n      article,\n      faq: faqJson,\n      keywords,\n      title_len: title.length,\n      desc_len: description.length,\n      article_len: article.length,\n      faq_count: d.faq ? d.faq.length : 0\n    }});\n\n  } catch(e) {\n    results.push({ json: { ok: 'false', url, error: ('parse_error: ' + e.message).slice(0,80) } });\n  }\n}\n\nreturn results;\n"
         }
       },
       {
@@ -540,18 +566,34 @@
     "autosaved": false,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-04-15T22:17:46.677Z",
-        "id": 807,
+        "createdAt": "2026-04-15T22:20:10.772Z",
+        "id": 829,
         "workflowId": "xPhhEHGFbGHjfZN7",
-        "versionId": "72ebbd5a-fafc-4613-a26c-9da0dc1474b4",
+        "versionId": "cfc35dc9-000d-42d6-baed-9301d51b4ac5",
         "event": "deactivated",
         "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
       },
       {
-        "createdAt": "2026-04-15T22:17:46.693Z",
-        "id": 808,
+        "createdAt": "2026-04-15T22:20:10.791Z",
+        "id": 830,
         "workflowId": "xPhhEHGFbGHjfZN7",
-        "versionId": "72ebbd5a-fafc-4613-a26c-9da0dc1474b4",
+        "versionId": "cfc35dc9-000d-42d6-baed-9301d51b4ac5",
+        "event": "activated",
+        "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
+      },
+      {
+        "createdAt": "2026-04-15T22:21:55.683Z",
+        "id": 831,
+        "workflowId": "xPhhEHGFbGHjfZN7",
+        "versionId": "cfc35dc9-000d-42d6-baed-9301d51b4ac5",
+        "event": "deactivated",
+        "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
+      },
+      {
+        "createdAt": "2026-04-15T22:21:55.777Z",
+        "id": 832,
+        "workflowId": "xPhhEHGFbGHjfZN7",
+        "versionId": "cfc35dc9-000d-42d6-baed-9301d51b4ac5",
         "event": "activated",
         "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
       }
