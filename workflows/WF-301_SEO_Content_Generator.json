@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-04-15T22:20:10.486Z",
+  "updatedAt": "2026-04-16T12:55:00.358Z",
   "createdAt": "2026-03-17T11:40:23.243Z",
   "id": "xPhhEHGFbGHjfZN7",
   "name": "WF-301 SEO Content Generator",
@@ -176,21 +176,6 @@
           "appendAttribution": false
         }
       }
-    },
-    {
-      "id": "webhook-manual",
-      "name": "Webhook: Manual Trigger",
-      "type": "n8n-nodes-base.webhook",
-      "typeVersion": 2,
-      "position": [
-        0,
-        160
-      ],
-      "parameters": {
-        "path": "wf301-manual",
-        "responseMode": "onReceived",
-        "responseData": "allEntries"
-      }
     }
   ],
   "connections": {
@@ -259,17 +244,6 @@
           }
         ]
       ]
-    },
-    "Webhook: Manual Trigger": {
-      "main": [
-        [
-          {
-            "node": "PG: Pages without article or faq",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
     }
   },
   "settings": {
@@ -291,10 +265,10 @@
   },
   "meta": null,
   "pinData": null,
-  "versionId": "cfc35dc9-000d-42d6-baed-9301d51b4ac5",
-  "activeVersionId": "cfc35dc9-000d-42d6-baed-9301d51b4ac5",
-  "versionCounter": 103,
-  "triggerCount": 1,
+  "versionId": "86383c0e-8503-4a2e-b428-239737abc975",
+  "activeVersionId": "86383c0e-8503-4a2e-b428-239737abc975",
+  "versionCounter": 111,
+  "triggerCount": 2,
   "shared": [
     {
       "updatedAt": "2026-03-17T11:40:23.243Z",
@@ -316,9 +290,9 @@
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-04-15T22:20:10.486Z",
-    "createdAt": "2026-04-15T22:20:10.486Z",
-    "versionId": "cfc35dc9-000d-42d6-baed-9301d51b4ac5",
+    "updatedAt": "2026-04-16T12:55:00.358Z",
+    "createdAt": "2026-04-16T12:55:00.358Z",
+    "versionId": "86383c0e-8503-4a2e-b428-239737abc975",
     "workflowId": "xPhhEHGFbGHjfZN7",
     "nodes": [
       {
@@ -359,7 +333,7 @@
         },
         "parameters": {
           "operation": "executeQuery",
-          "query": "SELECT ps.url, ps.title,\n  TRIM(split_part(split_part(coalesce(ps.title,''),' купить',1),' |',1)) as brand,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 'Gift Card'\n       WHEN ps.url LIKE '%-currency' THEN 'Currency'\n       WHEN ps.url LIKE '%-game-keys' THEN 'Game Keys'\n       WHEN ps.url LIKE '%-accounts' THEN 'Accounts'\n       WHEN ps.url LIKE '%-subscription' THEN 'Subscription'\n       ELSE 'Other' END as category\nFROM page_seo ps\nWHERE ps.lang='ru' AND ps.url LIKE '%/t/%'\n  AND ps.title IS NOT NULL AND length(ps.title)>5\n  AND (\n    ps.article IS NULL OR length(ps.article)=0\n    OR ps.faq IS NULL OR jsonb_array_length(ps.faq) < 3\n  )\nORDER BY\n  CASE\n    WHEN ps.url LIKE '%nutaku%'          THEN 1\n    WHEN ps.url LIKE '%telegram-star%'   THEN 2\n    WHEN ps.url LIKE '%steam-top-up%'    THEN 3\n    WHEN ps.url LIKE '%steam-wallet%'    THEN 4\n    WHEN ps.url LIKE '%roblox%'          THEN 5\n    WHEN ps.url LIKE '%minecraft%'       THEN 6\n    WHEN ps.url LIKE '%pubg%'            THEN 7\n    WHEN ps.url LIKE '%genshin%'         THEN 8\n    WHEN ps.url LIKE '%xbox%'            THEN 9\n    WHEN ps.url LIKE '%playstation%'     THEN 10\n    WHEN ps.url LIKE '%nintendo%'        THEN 11\n    WHEN ps.url LIKE '%spotify%'         THEN 12\n    WHEN ps.url LIKE '%discord%'         THEN 13\n    WHEN ps.url LIKE '%chatgpt%'         THEN 14\n    WHEN ps.url LIKE '%valorant%'        THEN 15\n    ELSE 99\n  END,\n  CASE\n    WHEN ps.url LIKE '%-gift-card' THEN 1\n    WHEN ps.url LIKE '%-currency'  THEN 2\n    WHEN ps.url LIKE '%-game-keys' THEN 3\n    WHEN ps.url LIKE '%-subscription' THEN 4\n    ELSE 5\n  END,\n  ps.url\nLIMIT 1000",
+          "query": "SELECT ps.url, ps.title,\n  TRIM(split_part(split_part(coalesce(ps.title,''),' купить',1),' |',1)) as brand,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 'Gift Card'\n       WHEN ps.url LIKE '%-currency' THEN 'Currency'\n       WHEN ps.url LIKE '%-game-keys' THEN 'Game Keys'\n       WHEN ps.url LIKE '%-accounts' THEN 'Accounts'\n       WHEN ps.url LIKE '%-subscription' THEN 'Subscription'\n       ELSE 'Other' END as category\nFROM page_seo ps\nWHERE ps.lang='ru' AND ps.url LIKE '%/t/%'\n  AND ps.title IS NOT NULL AND length(ps.title)>5\n  AND (\n    ps.article IS NULL OR length(ps.article)=0\n    OR ps.faq IS NULL OR jsonb_array_length(ps.faq) < 3\n  )\nORDER BY\n  CASE\n    WHEN ps.url LIKE '%nutaku%'          THEN 1\n    WHEN ps.url LIKE '%telegram-star%'   THEN 2\n    WHEN ps.url LIKE '%steam-top-up%'    THEN 3\n    WHEN ps.url LIKE '%steam-wallet%'    THEN 4\n    WHEN ps.url LIKE '%roblox%'          THEN 5\n    WHEN ps.url LIKE '%minecraft%'       THEN 6\n    WHEN ps.url LIKE '%pubg%'            THEN 7\n    WHEN ps.url LIKE '%genshin%'         THEN 8\n    WHEN ps.url LIKE '%xbox%'            THEN 9\n    WHEN ps.url LIKE '%playstation%'     THEN 10\n    WHEN ps.url LIKE '%nintendo%'        THEN 11\n    WHEN ps.url LIKE '%spotify%'         THEN 12\n    WHEN ps.url LIKE '%discord%'         THEN 13\n    WHEN ps.url LIKE '%chatgpt%'         THEN 14\n    WHEN ps.url LIKE '%valorant%'        THEN 15\n    ELSE 99\n  END,\n  CASE\n    WHEN ps.url LIKE '%-gift-card' THEN 1\n    WHEN ps.url LIKE '%-currency'  THEN 2\n    WHEN ps.url LIKE '%-game-keys' THEN 3\n    WHEN ps.url LIKE '%-subscription' THEN 4\n    ELSE 5\n  END,\n  ps.url\nLIMIT 5",
           "options": {
             "connectionTimeoutMillis": 30000
           }
@@ -490,6 +464,21 @@
             "appendAttribution": false
           }
         }
+      },
+      {
+        "id": "webhook-manual",
+        "name": "Webhook: Manual Trigger",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          0,
+          160
+        ],
+        "parameters": {
+          "path": "wf301-manual",
+          "responseMode": "onReceived",
+          "responseData": "allEntries"
+        }
       }
     ],
     "connections": {
@@ -497,14 +486,14 @@
         "main": [
           [
             {
-              "node": "PG: Pages without description",
+              "node": "PG: Pages without article or faq",
               "type": "main",
               "index": 0
             }
           ]
         ]
       },
-      "PG: Pages without description": {
+      "PG: Pages without article or faq": {
         "main": [
           [
             {
@@ -558,6 +547,17 @@
             }
           ]
         ]
+      },
+      "Webhook: Manual Trigger": {
+        "main": [
+          [
+            {
+              "node": "PG: Pages without article or faq",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
       }
     },
     "authors": "Kirill Silvestrov",
@@ -566,34 +566,18 @@
     "autosaved": false,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-04-15T22:20:10.772Z",
-        "id": 829,
+        "createdAt": "2026-04-16T12:55:00.582Z",
+        "id": 837,
         "workflowId": "xPhhEHGFbGHjfZN7",
-        "versionId": "cfc35dc9-000d-42d6-baed-9301d51b4ac5",
+        "versionId": "86383c0e-8503-4a2e-b428-239737abc975",
         "event": "deactivated",
         "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
       },
       {
-        "createdAt": "2026-04-15T22:20:10.791Z",
-        "id": 830,
+        "createdAt": "2026-04-16T12:55:00.677Z",
+        "id": 838,
         "workflowId": "xPhhEHGFbGHjfZN7",
-        "versionId": "cfc35dc9-000d-42d6-baed-9301d51b4ac5",
-        "event": "activated",
-        "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
-      },
-      {
-        "createdAt": "2026-04-15T22:21:55.683Z",
-        "id": 831,
-        "workflowId": "xPhhEHGFbGHjfZN7",
-        "versionId": "cfc35dc9-000d-42d6-baed-9301d51b4ac5",
-        "event": "deactivated",
-        "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
-      },
-      {
-        "createdAt": "2026-04-15T22:21:55.777Z",
-        "id": 832,
-        "workflowId": "xPhhEHGFbGHjfZN7",
-        "versionId": "cfc35dc9-000d-42d6-baed-9301d51b4ac5",
+        "versionId": "86383c0e-8503-4a2e-b428-239737abc975",
         "event": "activated",
         "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
       }
