@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-04-17T18:12:07.425Z",
+  "updatedAt": "2026-04-17T18:17:33.416Z",
   "createdAt": "2026-03-17T11:40:23.243Z",
   "id": "xPhhEHGFbGHjfZN7",
   "name": "WF-301 SEO Content Generator",
@@ -45,7 +45,7 @@
       },
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT ps.url, ps.title,\n  TRIM(split_part(split_part(coalesce(ps.title,''),' купить',1),' |',1)) as brand,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 'Gift Card'\n       WHEN ps.url LIKE '%-currency' THEN 'Currency'\n       WHEN ps.url LIKE '%-game-keys' THEN 'Game Keys'\n       WHEN ps.url LIKE '%-accounts' THEN 'Accounts'\n       WHEN ps.url LIKE '%-subscription' THEN 'Subscription'\n       ELSE 'Other' END as category\nFROM page_seo ps\nWHERE ps.lang='ru' AND ps.url LIKE '%/t/%'\n  AND ps.title IS NOT NULL AND length(ps.title) > 5\n  AND (\n    ps.article IS NULL OR length(ps.article) < 100\n    OR ps.faq IS NULL OR jsonb_array_length(ps.faq) < 3\n  )\nORDER BY\n  CASE WHEN ps.url LIKE '%nutaku%' THEN 1\n       WHEN ps.url LIKE '%telegram%' THEN 2\n       WHEN ps.url LIKE '%steam%' THEN 3\n       WHEN ps.url LIKE '%roblox%' THEN 4\n       WHEN ps.url LIKE '%minecraft%' THEN 5\n       WHEN ps.url LIKE '%pubg%' THEN 6\n       WHEN ps.url LIKE '%genshin%' THEN 7\n       WHEN ps.url LIKE '%xbox%' THEN 8\n       WHEN ps.url LIKE '%playstation%' THEN 9\n       ELSE 99 END,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 1\n       WHEN ps.url LIKE '%-currency' THEN 2\n       WHEN ps.url LIKE '%-game-keys' THEN 3\n       WHEN ps.url LIKE '%-subscription' THEN 4\n       ELSE 5 END,\n  ps.url\nLIMIT 3000",
+        "query": "SELECT ps.url, ps.title,\n  TRIM(split_part(split_part(coalesce(ps.title,''),' купить',1),' |',1)) as brand,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 'Gift Card'\n       WHEN ps.url LIKE '%-currency' THEN 'Currency'\n       WHEN ps.url LIKE '%-game-keys' THEN 'Game Keys'\n       WHEN ps.url LIKE '%-accounts' THEN 'Accounts'\n       WHEN ps.url LIKE '%-subscription' THEN 'Subscription'\n       ELSE 'Other' END as category\nFROM page_seo ps\nWHERE ps.lang='ru' AND ps.url LIKE '%/t/%'\n  AND ps.title IS NOT NULL AND length(ps.title) > 5\n  AND (\n    ps.article IS NULL OR length(ps.article) < 100\n    OR ps.faq IS NULL OR jsonb_array_length(ps.faq) < 3\n  )\nORDER BY\n  CASE WHEN ps.url LIKE '%nutaku%' THEN 1\n       WHEN ps.url LIKE '%telegram%' THEN 2\n       WHEN ps.url LIKE '%steam%' THEN 3\n       WHEN ps.url LIKE '%roblox%' THEN 4\n       WHEN ps.url LIKE '%minecraft%' THEN 5\n       WHEN ps.url LIKE '%pubg%' THEN 6\n       WHEN ps.url LIKE '%genshin%' THEN 7\n       WHEN ps.url LIKE '%xbox%' THEN 8\n       WHEN ps.url LIKE '%playstation%' THEN 9\n       ELSE 99 END,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 1\n       WHEN ps.url LIKE '%-currency' THEN 2\n       WHEN ps.url LIKE '%-game-keys' THEN 3\n       WHEN ps.url LIKE '%-subscription' THEN 4\n       ELSE 5 END,\n  ps.url\nLIMIT 1500",
         "options": {
           "connectionTimeoutMillis": 30000
         }
@@ -266,9 +266,9 @@
   },
   "meta": null,
   "pinData": null,
-  "versionId": "a2a655d3-ff9c-47a1-b6bc-21c59b326144",
-  "activeVersionId": "a2a655d3-ff9c-47a1-b6bc-21c59b326144",
-  "versionCounter": 127,
+  "versionId": "00638b06-4189-423a-aaa5-9d4e27be67ea",
+  "activeVersionId": "00638b06-4189-423a-aaa5-9d4e27be67ea",
+  "versionCounter": 137,
   "triggerCount": 1,
   "shared": [
     {
@@ -291,9 +291,9 @@
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-04-17T18:12:07.431Z",
-    "createdAt": "2026-04-17T18:12:07.431Z",
-    "versionId": "a2a655d3-ff9c-47a1-b6bc-21c59b326144",
+    "updatedAt": "2026-04-17T18:15:25.592Z",
+    "createdAt": "2026-04-17T18:15:25.592Z",
+    "versionId": "00638b06-4189-423a-aaa5-9d4e27be67ea",
     "workflowId": "xPhhEHGFbGHjfZN7",
     "nodes": [
       {
@@ -333,7 +333,7 @@
         },
         "parameters": {
           "operation": "executeQuery",
-          "query": "SELECT ps.url, ps.title,\n  TRIM(split_part(split_part(coalesce(ps.title,''),' купить',1),' |',1)) as brand,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 'Gift Card'\n       WHEN ps.url LIKE '%-currency' THEN 'Currency'\n       WHEN ps.url LIKE '%-game-keys' THEN 'Game Keys'\n       WHEN ps.url LIKE '%-accounts' THEN 'Accounts'\n       WHEN ps.url LIKE '%-subscription' THEN 'Subscription'\n       ELSE 'Other' END as category\nFROM page_seo ps\nWHERE ps.lang='ru' AND ps.url LIKE '%/t/%'\n  AND ps.title IS NOT NULL AND length(ps.title) > 5\n  AND (\n    -- Нет article ни в колонке, ни в seo_data\n    (\n      (ps.article IS NULL OR length(ps.article) = 0)\n      AND (ps.seo_data->'ru'->>'article' IS NULL \n           OR length(ps.seo_data->'ru'->>'article') = 0)\n    )\n    OR\n    -- Нет faq ни в колонке, ни в seo_data\n    (\n      (ps.faq IS NULL OR jsonb_array_length(ps.faq) < 3)\n      AND (ps.seo_data->'ru'->'faq' IS NULL \n           OR jsonb_array_length(ps.seo_data->'ru'->'faq') < 3)\n    )\n  )\nORDER BY\n  CASE\n    WHEN ps.url LIKE '%nutaku%'          THEN 1\n    WHEN ps.url LIKE '%telegram-star%'   THEN 2\n    WHEN ps.url LIKE '%steam-top-up%'    THEN 3\n    WHEN ps.url LIKE '%steam-wallet%'    THEN 4\n    WHEN ps.url LIKE '%roblox%'          THEN 5\n    WHEN ps.url LIKE '%minecraft%'       THEN 6\n    WHEN ps.url LIKE '%pubg%'            THEN 7\n    WHEN ps.url LIKE '%genshin%'         THEN 8\n    WHEN ps.url LIKE '%xbox%'            THEN 9\n    WHEN ps.url LIKE '%playstation%'     THEN 10\n    WHEN ps.url LIKE '%nintendo%'        THEN 11\n    WHEN ps.url LIKE '%spotify%'         THEN 12\n    WHEN ps.url LIKE '%discord%'         THEN 13\n    WHEN ps.url LIKE '%chatgpt%'         THEN 14\n    WHEN ps.url LIKE '%valorant%'        THEN 15\n    ELSE 99\n  END,\n  CASE\n    WHEN ps.url LIKE '%-gift-card'    THEN 1\n    WHEN ps.url LIKE '%-currency'     THEN 2\n    WHEN ps.url LIKE '%-game-keys'    THEN 3\n    WHEN ps.url LIKE '%-subscription' THEN 4\n    ELSE 5\n  END,\n  ps.url\nLIMIT 3000",
+          "query": "SELECT ps.url, ps.title,\n  TRIM(split_part(split_part(coalesce(ps.title,''),' купить',1),' |',1)) as brand,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 'Gift Card'\n       WHEN ps.url LIKE '%-currency' THEN 'Currency'\n       WHEN ps.url LIKE '%-game-keys' THEN 'Game Keys'\n       WHEN ps.url LIKE '%-accounts' THEN 'Accounts'\n       WHEN ps.url LIKE '%-subscription' THEN 'Subscription'\n       ELSE 'Other' END as category\nFROM page_seo ps\nWHERE ps.lang='ru' AND ps.url LIKE '%/t/%'\n  AND ps.title IS NOT NULL AND length(ps.title) > 5\n  AND (\n    ps.article IS NULL OR length(ps.article) < 100\n    OR ps.faq IS NULL OR jsonb_array_length(ps.faq) < 3\n  )\nORDER BY\n  CASE WHEN ps.url LIKE '%nutaku%' THEN 1\n       WHEN ps.url LIKE '%telegram%' THEN 2\n       WHEN ps.url LIKE '%steam%' THEN 3\n       WHEN ps.url LIKE '%roblox%' THEN 4\n       WHEN ps.url LIKE '%minecraft%' THEN 5\n       WHEN ps.url LIKE '%pubg%' THEN 6\n       WHEN ps.url LIKE '%genshin%' THEN 7\n       WHEN ps.url LIKE '%xbox%' THEN 8\n       WHEN ps.url LIKE '%playstation%' THEN 9\n       ELSE 99 END,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 1\n       WHEN ps.url LIKE '%-currency' THEN 2\n       WHEN ps.url LIKE '%-game-keys' THEN 3\n       WHEN ps.url LIKE '%-subscription' THEN 4\n       ELSE 5 END,\n  ps.url\nLIMIT 3000",
           "options": {
             "connectionTimeoutMillis": 30000
           }
@@ -541,18 +541,34 @@
     "autosaved": false,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-04-17T18:12:07.498Z",
-        "id": 2508,
+        "createdAt": "2026-04-17T18:15:25.688Z",
+        "id": 2512,
         "workflowId": "xPhhEHGFbGHjfZN7",
-        "versionId": "a2a655d3-ff9c-47a1-b6bc-21c59b326144",
+        "versionId": "00638b06-4189-423a-aaa5-9d4e27be67ea",
         "event": "deactivated",
         "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
       },
       {
-        "createdAt": "2026-04-17T18:12:07.582Z",
-        "id": 2509,
+        "createdAt": "2026-04-17T18:15:25.767Z",
+        "id": 2513,
         "workflowId": "xPhhEHGFbGHjfZN7",
-        "versionId": "a2a655d3-ff9c-47a1-b6bc-21c59b326144",
+        "versionId": "00638b06-4189-423a-aaa5-9d4e27be67ea",
+        "event": "activated",
+        "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
+      },
+      {
+        "createdAt": "2026-04-17T18:17:33.497Z",
+        "id": 2514,
+        "workflowId": "xPhhEHGFbGHjfZN7",
+        "versionId": "00638b06-4189-423a-aaa5-9d4e27be67ea",
+        "event": "deactivated",
+        "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
+      },
+      {
+        "createdAt": "2026-04-17T18:17:33.523Z",
+        "id": 2515,
+        "workflowId": "xPhhEHGFbGHjfZN7",
+        "versionId": "00638b06-4189-423a-aaa5-9d4e27be67ea",
         "event": "activated",
         "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
       }
