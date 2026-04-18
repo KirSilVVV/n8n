@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-04-18T16:37:32.723Z",
+  "updatedAt": "2026-04-18T16:40:43.254Z",
   "createdAt": "2026-03-17T11:40:23.243Z",
   "id": "xPhhEHGFbGHjfZN7",
   "name": "WF-301 SEO Content Generator",
@@ -101,7 +101,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst claudeItems = $input.all();\nconst pgItems = $('PG: Pages without article or faq').all();\nconst results = [];\n\nfunction escapeSql(s) {\n  return (s || '').replace(/'/g, \"''\");\n}\n\nfor (let i = 0; i < claudeItems.length; i++) {\n  const resp = claudeItems[i].json;\n  const pg = pgItems[i] ? pgItems[i].json : {};\n  const url = pg.url || '';\n\n  if (resp.error) {\n    results.push({ json: { ok: 'false', url, error: (resp.error.message||'api error').slice(0,80) } });\n    continue;\n  }\n\n  try {\n    let text = (resp.content || [])[0]?.text || '';\n    text = text.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/\\s*```$/i, '').trim();\n    const start = text.indexOf('{');\n    const end = text.lastIndexOf('}');\n    if (start !== -1 && end !== -1 && end > start) {\n      text = text.slice(start, end + 1);\n    }\n    \n    const seo = JSON.parse(text);\n    const article = (seo.article || '').trim();\n    const faq = Array.isArray(seo.faq) ? seo.faq : [];\n    \n    if (article.length < 200) {\n      results.push({ json: { ok: 'false', url, error: 'article too short: ' + article.length } });\n      continue;\n    }\n    \n    // Экранируем для PostgreSQL\n    results.push({\n      json: {\n        ok: 'true',\n        url: escapeSql(url),\n        title: escapeSql((seo.title || '').slice(0, 200)),\n        description: escapeSql((seo.description || '').slice(0, 500)),\n        h1: escapeSql((seo.h1 || '').slice(0, 200)),\n        article: escapeSql(article),\n        faq: escapeSql(JSON.stringify(faq)),\n        url_raw: url\n      }\n    });\n  } catch(e) {\n    results.push({ json: { ok: 'false', url, error: ('parse: ' + e.message).slice(0,80) } });\n  }\n}\n\nreturn results;\n"
+        "jsCode": "\nconst claudeItems = $input.all();\nconst pgItems = $('PG: Pages without article or faq').all();\nconst results = [];\n\nfunction cleanForSql(s) {\n  // Заменяем одинарную кавычку на типографский апостроф (безопасно для SQL и читаемо)\n  return (s || '').replace(/'/g, '\\u2019').replace(/\\\\/g, '');\n}\n\nfor (let i = 0; i < claudeItems.length; i++) {\n  const resp = claudeItems[i].json;\n  const pg = pgItems[i] ? pgItems[i].json : {};\n  const url = pg.url || '';\n\n  if (resp.error) {\n    results.push({ json: { ok: 'false', url, error: (resp.error.message||'api error').slice(0,80) } });\n    continue;\n  }\n\n  try {\n    let text = (resp.content || [])[0]?.text || '';\n    // Чистим markdown\n    text = text.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/\\s*```$/i, '').trim();\n    const start = text.indexOf('{');\n    const end = text.lastIndexOf('}');\n    if (start !== -1 && end !== -1 && end > start) {\n      text = text.slice(start, end + 1);\n    }\n    \n    const seo = JSON.parse(text);\n    const article = (seo.article || '').trim();\n    const faq = Array.isArray(seo.faq) ? seo.faq : [];\n    \n    if (article.length < 200) {\n      results.push({ json: { ok: 'false', url, error: 'article too short: ' + article.length } });\n      continue;\n    }\n    \n    // Чистим все поля от апострофов\n    const faqClean = faq.map(q => ({\n      question: cleanForSql(q.question || ''),\n      answer: cleanForSql(q.answer || '')\n    }));\n    \n    results.push({\n      json: {\n        ok: 'true',\n        url_raw: url,\n        title: cleanForSql((seo.title || '').slice(0, 200)),\n        description: cleanForSql((seo.description || '').slice(0, 500)),\n        h1: cleanForSql((seo.h1 || '').slice(0, 200)),\n        article: cleanForSql(article),\n        faq: JSON.stringify(faqClean)\n      }\n    });\n  } catch(e) {\n    results.push({ json: { ok: 'false', url, error: ('parse: ' + e.message).slice(0,80) } });\n  }\n}\n\nreturn results;\n"
       },
       "id": "parse",
       "name": "Parse Claude response",
@@ -115,7 +115,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "UPDATE page_seo SET\n  title='{{ $json.title }}',\n  description='{{ $json.description }}',\n  h1='{{ $json.h1 }}',\n  article='{{ $json.article }}',\n  faq=CASE \n    WHEN '{{ $json.faq }}' != '' AND '{{ $json.faq }}' != '[]'\n    THEN ('{{ $json.faq }}')::jsonb\n    ELSE faq\n  END,\n  updated_at=now()\nWHERE url='{{ $json.url_raw }}' AND lang='ru'\n  AND '{{ $json.ok }}' = 'true'\nRETURNING id::text, url",
+        "query": "UPDATE page_seo SET\n  title='{{ $json.title }}',\n  description='{{ $json.description }}',\n  h1='{{ $json.h1 }}',\n  article='{{ $json.article }}',\n  faq='{{ $json.faq }}'::jsonb,\n  updated_at=now()\nWHERE url='{{ $json.url_raw }}' AND lang='ru'\n  AND '{{ $json.ok }}' = 'true'\nRETURNING id::text, url",
         "options": {}
       },
       "id": "pgw",
@@ -259,9 +259,9 @@
   },
   "meta": null,
   "pinData": {},
-  "versionId": "bd1ca6be-cd8b-4d68-a35d-cfecad03dea4",
-  "activeVersionId": "bd1ca6be-cd8b-4d68-a35d-cfecad03dea4",
-  "versionCounter": 238,
+  "versionId": "e160e333-04b3-4e90-9868-d51f56157ed7",
+  "activeVersionId": "e160e333-04b3-4e90-9868-d51f56157ed7",
+  "versionCounter": 243,
   "triggerCount": 1,
   "shared": [
     {
@@ -284,9 +284,9 @@
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-04-18T16:37:32.728Z",
-    "createdAt": "2026-04-18T16:37:32.728Z",
-    "versionId": "bd1ca6be-cd8b-4d68-a35d-cfecad03dea4",
+    "updatedAt": "2026-04-18T16:40:43.257Z",
+    "createdAt": "2026-04-18T16:40:43.257Z",
+    "versionId": "e160e333-04b3-4e90-9868-d51f56157ed7",
     "workflowId": "xPhhEHGFbGHjfZN7",
     "nodes": [
       {
@@ -509,7 +509,7 @@
           ]
         ]
       },
-      "Webhook Trigger": {
+      "Schedule 21:00": {
         "main": [
           [
             {
@@ -527,10 +527,10 @@
     "autosaved": false,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-04-18T16:37:35.067Z",
-        "id": 3436,
+        "createdAt": "2026-04-18T16:40:45.478Z",
+        "id": 3438,
         "workflowId": "xPhhEHGFbGHjfZN7",
-        "versionId": "bd1ca6be-cd8b-4d68-a35d-cfecad03dea4",
+        "versionId": "e160e333-04b3-4e90-9868-d51f56157ed7",
         "event": "activated",
         "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
       }
