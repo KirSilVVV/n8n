@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-04-18T16:32:46.135Z",
+  "updatedAt": "2026-04-18T16:37:32.723Z",
   "createdAt": "2026-03-17T11:40:23.243Z",
   "id": "xPhhEHGFbGHjfZN7",
   "name": "WF-301 SEO Content Generator",
@@ -12,9 +12,8 @@
         "rule": {
           "interval": [
             {
-              "field": "hours",
-              "hoursInterval": 24,
-              "triggerAtHour": 21
+              "field": "cronExpression",
+              "expression": "0 21 * * *"
             }
           ]
         }
@@ -22,7 +21,7 @@
       "id": "sched",
       "name": "Schedule 21:00",
       "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 2,
+      "typeVersion": 1.2,
       "position": [
         0,
         304
@@ -228,7 +227,7 @@
         ]
       ]
     },
-    "Webhook Trigger": {
+    "Schedule 21:00": {
       "main": [
         [
           {
@@ -260,9 +259,9 @@
   },
   "meta": null,
   "pinData": {},
-  "versionId": "ffe081bf-efc6-4881-99f8-2c2769a9367f",
-  "activeVersionId": "ffe081bf-efc6-4881-99f8-2c2769a9367f",
-  "versionCounter": 231,
+  "versionId": "bd1ca6be-cd8b-4d68-a35d-cfecad03dea4",
+  "activeVersionId": "bd1ca6be-cd8b-4d68-a35d-cfecad03dea4",
+  "versionCounter": 238,
   "triggerCount": 1,
   "shared": [
     {
@@ -285,27 +284,30 @@
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-04-18T16:27:08.676Z",
-    "createdAt": "2026-04-18T16:27:08.676Z",
-    "versionId": "ffe081bf-efc6-4881-99f8-2c2769a9367f",
+    "updatedAt": "2026-04-18T16:37:32.728Z",
+    "createdAt": "2026-04-18T16:37:32.728Z",
+    "versionId": "bd1ca6be-cd8b-4d68-a35d-cfecad03dea4",
     "workflowId": "xPhhEHGFbGHjfZN7",
     "nodes": [
       {
         "parameters": {
-          "path": "wf301-seo-run",
-          "httpMethod": "GET",
-          "responseMode": "onReceived",
-          "responseData": "firstEntryJson"
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 21 * * *"
+              }
+            ]
+          }
         },
         "id": "sched",
-        "name": "Webhook Trigger",
-        "type": "n8n-nodes-base.webhook",
-        "typeVersion": 2,
+        "name": "Schedule 21:00",
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
         "position": [
           0,
           304
-        ],
-        "webhookId": "5c471f9b-56a4-4ef2-b0fe-85ca932c8b04"
+        ]
       },
       {
         "parameters": {
@@ -395,7 +397,7 @@
       {
         "parameters": {
           "operation": "executeQuery",
-          "query": "UPDATE page_seo SET\n  title='{{ $json.title }}',\n  description='{{ $json.description }}',\n  h1='{{ $json.h1 }}',\n  article=CASE\n    WHEN '{{ $json.article }}' != '' AND '{{ $json.article }}' != 'null'\n    THEN '{{ $json.article }}'\n    ELSE article\n  END,\n  faq=CASE \n    WHEN '{{ $json.faq }}' != '' AND '{{ $json.faq }}' != '[]'\n    THEN '{{ $json.faq }}'::jsonb\n    ELSE faq\n  END,\n  updated_at=now()\nWHERE url='{{ $json.url }}' AND lang='ru'\n  AND '{{ $json.ok }}' = 'true'\nRETURNING id::text, url",
+          "query": "UPDATE page_seo SET\n  title='{{ $json.title }}',\n  description='{{ $json.description }}',\n  h1='{{ $json.h1 }}',\n  article='{{ $json.article }}',\n  faq=CASE \n    WHEN '{{ $json.faq }}' != '' AND '{{ $json.faq }}' != '[]'\n    THEN ('{{ $json.faq }}')::jsonb\n    ELSE faq\n  END,\n  updated_at=now()\nWHERE url='{{ $json.url_raw }}' AND lang='ru'\n  AND '{{ $json.ok }}' = 'true'\nRETURNING id::text, url",
           "options": {}
         },
         "id": "pgw",
@@ -525,26 +527,10 @@
     "autosaved": false,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-04-18T16:27:10.979Z",
-        "id": 3432,
+        "createdAt": "2026-04-18T16:37:35.067Z",
+        "id": 3436,
         "workflowId": "xPhhEHGFbGHjfZN7",
-        "versionId": "ffe081bf-efc6-4881-99f8-2c2769a9367f",
-        "event": "activated",
-        "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
-      },
-      {
-        "createdAt": "2026-04-18T16:32:43.939Z",
-        "id": 3433,
-        "workflowId": "xPhhEHGFbGHjfZN7",
-        "versionId": "ffe081bf-efc6-4881-99f8-2c2769a9367f",
-        "event": "deactivated",
-        "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
-      },
-      {
-        "createdAt": "2026-04-18T16:32:49.767Z",
-        "id": 3434,
-        "workflowId": "xPhhEHGFbGHjfZN7",
-        "versionId": "ffe081bf-efc6-4881-99f8-2c2769a9367f",
+        "versionId": "bd1ca6be-cd8b-4d68-a35d-cfecad03dea4",
         "event": "activated",
         "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
       }
