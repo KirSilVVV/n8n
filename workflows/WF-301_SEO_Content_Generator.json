@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-04-17T22:02:29.568Z",
+  "updatedAt": "2026-04-18T15:58:35.978Z",
   "createdAt": "2026-03-17T11:40:23.243Z",
   "id": "xPhhEHGFbGHjfZN7",
   "name": "WF-301 SEO Content Generator",
@@ -12,9 +12,8 @@
         "rule": {
           "interval": [
             {
-              "field": "hours",
-              "hoursInterval": 24,
-              "triggerAtHour": 21
+              "field": "minutes",
+              "minutesInterval": 1
             }
           ]
         }
@@ -31,7 +30,7 @@
     {
       "parameters": {
         "operation": "executeQuery",
-        "query": "SELECT ps.url, ps.title,\n  TRIM(split_part(split_part(coalesce(ps.title,''),' купить',1),' |',1)) as brand,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 'Gift Card'\n       WHEN ps.url LIKE '%-currency' THEN 'Currency'\n       WHEN ps.url LIKE '%-game-keys' THEN 'Game Keys'\n       WHEN ps.url LIKE '%-accounts' THEN 'Accounts'\n       WHEN ps.url LIKE '%-subscription' THEN 'Subscription'\n       ELSE 'Other' END as category\nFROM page_seo ps\nWHERE ps.lang='ru' AND ps.url LIKE '%/t/%'\n  AND ps.title IS NOT NULL AND length(ps.title) > 5\n  AND (\n    ps.article IS NULL OR length(ps.article) < 380\n    OR ps.faq IS NULL OR jsonb_array_length(ps.faq) < 3\n  )\nORDER BY\n  CASE WHEN ps.url LIKE '%nutaku%' THEN 1\n       WHEN ps.url LIKE '%telegram%' THEN 2\n       WHEN ps.url LIKE '%steam%' THEN 3\n       WHEN ps.url LIKE '%roblox%' THEN 4\n       WHEN ps.url LIKE '%minecraft%' THEN 5\n       WHEN ps.url LIKE '%pubg%' THEN 6\n       WHEN ps.url LIKE '%genshin%' THEN 7\n       WHEN ps.url LIKE '%xbox%' THEN 8\n       WHEN ps.url LIKE '%playstation%' THEN 9\n       ELSE 99 END,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 1\n       WHEN ps.url LIKE '%-currency' THEN 2\n       WHEN ps.url LIKE '%-game-keys' THEN 3\n       WHEN ps.url LIKE '%-subscription' THEN 4\n       ELSE 5 END,\n  ps.url\nLIMIT 1500",
+        "query": "SELECT ps.url, ps.title,\n  TRIM(split_part(split_part(coalesce(ps.title,''),' купить',1),' |',1)) as brand,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 'Gift Card'\n       WHEN ps.url LIKE '%-currency' THEN 'Currency'\n       WHEN ps.url LIKE '%-game-keys' THEN 'Game Keys'\n       WHEN ps.url LIKE '%-accounts' THEN 'Accounts'\n       WHEN ps.url LIKE '%-subscription' THEN 'Subscription'\n       ELSE 'Other' END as category\nFROM page_seo ps\nWHERE ps.lang='ru' AND ps.url LIKE '%/t/%'\n  AND ps.title IS NOT NULL AND length(ps.title) > 5\n  AND (\n    ps.article IS NULL OR length(ps.article) < 380\n    OR ps.faq IS NULL OR jsonb_array_length(ps.faq) < 3\n  )\nORDER BY\n  CASE WHEN ps.url LIKE '%nutaku%' THEN 1\n       WHEN ps.url LIKE '%telegram%' THEN 2\n       WHEN ps.url LIKE '%steam%' THEN 3\n       WHEN ps.url LIKE '%roblox%' THEN 4\n       WHEN ps.url LIKE '%minecraft%' THEN 5\n       WHEN ps.url LIKE '%pubg%' THEN 6\n       WHEN ps.url LIKE '%genshin%' THEN 7\n       WHEN ps.url LIKE '%xbox%' THEN 8\n       WHEN ps.url LIKE '%playstation%' THEN 9\n       ELSE 99 END,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 1\n       WHEN ps.url LIKE '%-currency' THEN 2\n       WHEN ps.url LIKE '%-game-keys' THEN 3\n       WHEN ps.url LIKE '%-subscription' THEN 4\n       ELSE 5 END,\n  ps.url\nLIMIT 2000",
         "options": {}
       },
       "id": "pg",
@@ -102,7 +101,7 @@
     },
     {
       "parameters": {
-        "jsCode": "\nconst claudeItems = $input.all();\nconst pgItems = $('PG: Pages without article or faq').all();\nconst results = [];\n\nfor (let i = 0; i < claudeItems.length; i++) {\n  const resp = claudeItems[i].json;\n  const pg = pgItems[i] ? pgItems[i].json : {};\n  const url = pg.url || '';\n\n  if (resp.error) {\n    results.push({ json: { ok: 'false', url, error: (resp.error.message||'api error').slice(0,80) } });\n    continue;\n  }\n\n  try {\n    let text = (resp.content || [])[0]?.text || '';\n    text = text.replace(/```json\\n?/gi,'').replace(/```\\n?/g,'').trim();\n    const d = JSON.parse(text);\n\n    // Escape single quotes for PostgreSQL\n    const esc = s => (s || '').replace(/'/g, \"''\").trim();\n\n    // Validate FAQ format: must be [{question, answer}, ...]\n    let faqJson = '[]';\n    if (Array.isArray(d.faq) && d.faq.length >= 3) {\n      const validFaq = d.faq\n        .filter(f => f.question && f.answer)\n        .map(f => ({ question: esc(f.question), answer: esc(f.answer) }));\n      if (validFaq.length >= 3) {\n        faqJson = JSON.stringify(validFaq);\n      }\n    }\n\n    // Validate lengths\n    const title = esc(d.title || '');\n    const description = esc(d.description || '');\n    const h1 = esc(d.h1 || '');\n    const article = esc(d.article || '');\n    const keywords = esc(d.keywords || '');\n\n    const ok = title.length >= 30 && description.length >= 100 ? 'true' : 'false';\n\n    results.push({ json: {\n      ok,\n      url,\n      title,\n      description,\n      h1,\n      article,\n      faq: faqJson,\n      keywords,\n      title_len: title.length,\n      desc_len: description.length,\n      article_len: article.length,\n      faq_count: d.faq ? d.faq.length : 0\n    }});\n\n  } catch(e) {\n    results.push({ json: { ok: 'false', url, error: ('parse_error: ' + e.message).slice(0,80) } });\n  }\n}\n\nreturn results;\n"
+        "jsCode": "\nconst claudeItems = $input.all();\nconst pgItems = $('PG: Pages without article or faq').all();\nconst results = [];\n\nfor (let i = 0; i < claudeItems.length; i++) {\n  const resp = claudeItems[i].json;\n  const pg = pgItems[i] ? pgItems[i].json : {};\n  const url = pg.url || '';\n\n  if (resp.error) {\n    results.push({ json: { ok: 'false', url, error: (resp.error.message||'api error').slice(0,80) } });\n    continue;\n  }\n\n  try {\n    let text = (resp.content || [])[0]?.text || '';\n    // Чистим markdown обёртки\n    text = text.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/\\s*```$/i, '').trim();\n    // Убираем всё до первой { и после последней }\n    const start = text.indexOf('{');\n    const end = text.lastIndexOf('}');\n    if (start !== -1 && end !== -1 && end > start) {\n      text = text.slice(start, end + 1);\n    }\n    \n    const seo = JSON.parse(text);\n    \n    const article = (seo.article || '').trim();\n    const faq = Array.isArray(seo.faq) ? seo.faq : [];\n    \n    // Пропускаем если article слишком короткий\n    if (article.length < 200) {\n      results.push({ json: { ok: 'false', url, error: 'article too short: ' + article.length } });\n      continue;\n    }\n    \n    results.push({\n      json: {\n        ok: 'true',\n        url,\n        title: (seo.title || '').slice(0, 200),\n        description: (seo.description || '').slice(0, 500),\n        h1: (seo.h1 || '').slice(0, 200),\n        article,\n        faq: JSON.stringify(faq),\n        related_queries: (seo.related_queries || '')\n      }\n    });\n  } catch(e) {\n    results.push({ json: { ok: 'false', url, error: ('parse: ' + e.message).slice(0,80) } });\n  }\n}\n\nreturn results;\n"
       },
       "id": "parse",
       "name": "Parse Claude response",
@@ -260,9 +259,9 @@
   },
   "meta": null,
   "pinData": {},
-  "versionId": "ff0b7205-bf2b-4df5-ba02-da7e7e186ae4",
-  "activeVersionId": "ff0b7205-bf2b-4df5-ba02-da7e7e186ae4",
-  "versionCounter": 204,
+  "versionId": "f81dbcc4-ee5e-4147-ab54-37ca9e2bb832",
+  "activeVersionId": "f81dbcc4-ee5e-4147-ab54-37ca9e2bb832",
+  "versionCounter": 212,
   "triggerCount": 1,
   "shared": [
     {
@@ -285,9 +284,9 @@
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-04-17T22:02:29.570Z",
-    "createdAt": "2026-04-17T22:02:29.570Z",
-    "versionId": "ff0b7205-bf2b-4df5-ba02-da7e7e186ae4",
+    "updatedAt": "2026-04-18T15:58:35.981Z",
+    "createdAt": "2026-04-18T15:58:35.981Z",
+    "versionId": "f81dbcc4-ee5e-4147-ab54-37ca9e2bb832",
     "workflowId": "xPhhEHGFbGHjfZN7",
     "nodes": [
       {
@@ -295,9 +294,8 @@
           "rule": {
             "interval": [
               {
-                "field": "hours",
-                "hoursInterval": 24,
-                "triggerAtHour": 23
+                "field": "minutes",
+                "minutesInterval": 1
               }
             ]
           }
@@ -314,7 +312,7 @@
       {
         "parameters": {
           "operation": "executeQuery",
-          "query": "SELECT ps.url, ps.title,\n  TRIM(split_part(split_part(coalesce(ps.title,''),' купить',1),' |',1)) as brand,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 'Gift Card'\n       WHEN ps.url LIKE '%-currency' THEN 'Currency'\n       WHEN ps.url LIKE '%-game-keys' THEN 'Game Keys'\n       WHEN ps.url LIKE '%-accounts' THEN 'Accounts'\n       WHEN ps.url LIKE '%-subscription' THEN 'Subscription'\n       ELSE 'Other' END as category\nFROM page_seo ps\nWHERE ps.lang='ru' AND ps.url LIKE '%/t/%'\n  AND ps.title IS NOT NULL AND length(ps.title) > 5\n  AND (\n    ps.article IS NULL OR length(ps.article) < 100\n    OR ps.faq IS NULL OR jsonb_array_length(ps.faq) < 3\n  )\nORDER BY\n  CASE WHEN ps.url LIKE '%nutaku%' THEN 1\n       WHEN ps.url LIKE '%telegram%' THEN 2\n       WHEN ps.url LIKE '%steam%' THEN 3\n       WHEN ps.url LIKE '%roblox%' THEN 4\n       WHEN ps.url LIKE '%minecraft%' THEN 5\n       WHEN ps.url LIKE '%pubg%' THEN 6\n       WHEN ps.url LIKE '%genshin%' THEN 7\n       WHEN ps.url LIKE '%xbox%' THEN 8\n       WHEN ps.url LIKE '%playstation%' THEN 9\n       ELSE 99 END,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 1\n       WHEN ps.url LIKE '%-currency' THEN 2\n       WHEN ps.url LIKE '%-game-keys' THEN 3\n       WHEN ps.url LIKE '%-subscription' THEN 4\n       ELSE 5 END,\n  ps.url\nLIMIT 1500",
+          "query": "SELECT ps.url, ps.title,\n  TRIM(split_part(split_part(coalesce(ps.title,''),' купить',1),' |',1)) as brand,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 'Gift Card'\n       WHEN ps.url LIKE '%-currency' THEN 'Currency'\n       WHEN ps.url LIKE '%-game-keys' THEN 'Game Keys'\n       WHEN ps.url LIKE '%-accounts' THEN 'Accounts'\n       WHEN ps.url LIKE '%-subscription' THEN 'Subscription'\n       ELSE 'Other' END as category\nFROM page_seo ps\nWHERE ps.lang='ru' AND ps.url LIKE '%/t/%'\n  AND ps.title IS NOT NULL AND length(ps.title) > 5\n  AND (\n    ps.article IS NULL OR length(ps.article) < 380\n    OR ps.faq IS NULL OR jsonb_array_length(ps.faq) < 3\n  )\nORDER BY\n  CASE WHEN ps.url LIKE '%nutaku%' THEN 1\n       WHEN ps.url LIKE '%telegram%' THEN 2\n       WHEN ps.url LIKE '%steam%' THEN 3\n       WHEN ps.url LIKE '%roblox%' THEN 4\n       WHEN ps.url LIKE '%minecraft%' THEN 5\n       WHEN ps.url LIKE '%pubg%' THEN 6\n       WHEN ps.url LIKE '%genshin%' THEN 7\n       WHEN ps.url LIKE '%xbox%' THEN 8\n       WHEN ps.url LIKE '%playstation%' THEN 9\n       ELSE 99 END,\n  CASE WHEN ps.url LIKE '%-gift-card' THEN 1\n       WHEN ps.url LIKE '%-currency' THEN 2\n       WHEN ps.url LIKE '%-game-keys' THEN 3\n       WHEN ps.url LIKE '%-subscription' THEN 4\n       ELSE 5 END,\n  ps.url\nLIMIT 2000",
           "options": {}
         },
         "id": "pg",
@@ -529,10 +527,10 @@
     "autosaved": false,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-04-17T22:02:31.775Z",
-        "id": 3165,
+        "createdAt": "2026-04-18T15:58:38.707Z",
+        "id": 3421,
         "workflowId": "xPhhEHGFbGHjfZN7",
-        "versionId": "ff0b7205-bf2b-4df5-ba02-da7e7e186ae4",
+        "versionId": "f81dbcc4-ee5e-4147-ab54-37ca9e2bb832",
         "event": "activated",
         "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
       }
