@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-04-18T16:01:06.098Z",
+  "updatedAt": "2026-04-18T16:03:48.219Z",
   "createdAt": "2026-03-17T11:40:23.243Z",
   "id": "xPhhEHGFbGHjfZN7",
   "name": "WF-301 SEO Content Generator",
@@ -9,19 +9,15 @@
   "nodes": [
     {
       "parameters": {
-        "rule": {
-          "interval": [
-            {
-              "field": "minutes",
-              "minutesInterval": 1
-            }
-          ]
-        }
+        "path": "wf301-seo-run",
+        "httpMethod": "GET",
+        "responseMode": "onReceived",
+        "responseData": "firstEntryJson"
       },
       "id": "sched",
-      "name": "Schedule 21:00",
-      "type": "n8n-nodes-base.scheduleTrigger",
-      "typeVersion": 1.2,
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
       "position": [
         0,
         304
@@ -172,17 +168,6 @@
     }
   ],
   "connections": {
-    "Schedule 21:00": {
-      "main": [
-        [
-          {
-            "node": "PG: Pages without article or faq",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "PG: Pages without article or faq": {
       "main": [
         [
@@ -237,6 +222,17 @@
           }
         ]
       ]
+    },
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "PG: Pages without article or faq",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "settings": {
@@ -259,9 +255,9 @@
   },
   "meta": null,
   "pinData": {},
-  "versionId": "2d80e886-74b1-446c-a7b8-7a40b734f87e",
-  "activeVersionId": "2d80e886-74b1-446c-a7b8-7a40b734f87e",
-  "versionCounter": 216,
+  "versionId": "fb1a9707-a6cc-43d8-9205-a331c5d0a92c",
+  "activeVersionId": "fb1a9707-a6cc-43d8-9205-a331c5d0a92c",
+  "versionCounter": 222,
   "triggerCount": 1,
   "shared": [
     {
@@ -284,9 +280,9 @@
   ],
   "tags": [],
   "activeVersion": {
-    "updatedAt": "2026-04-18T16:01:06.100Z",
-    "createdAt": "2026-04-18T16:01:06.100Z",
-    "versionId": "2d80e886-74b1-446c-a7b8-7a40b734f87e",
+    "updatedAt": "2026-04-18T16:03:48.221Z",
+    "createdAt": "2026-04-18T16:03:48.221Z",
+    "versionId": "fb1a9707-a6cc-43d8-9205-a331c5d0a92c",
     "workflowId": "xPhhEHGFbGHjfZN7",
     "nodes": [
       {
@@ -383,7 +379,7 @@
       },
       {
         "parameters": {
-          "jsCode": "\nconst claudeItems = $input.all();\nconst pgItems = $('PG: Pages without article or faq').all();\nconst results = [];\n\nfor (let i = 0; i < claudeItems.length; i++) {\n  const resp = claudeItems[i].json;\n  const pg = pgItems[i] ? pgItems[i].json : {};\n  const url = pg.url || '';\n\n  if (resp.error) {\n    results.push({ json: { ok: 'false', url, error: (resp.error.message||'api error').slice(0,80) } });\n    continue;\n  }\n\n  try {\n    let text = (resp.content || [])[0]?.text || '';\n    // Чистим markdown обёртки\n    text = text.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/\\s*```$/i, '').trim();\n    // Убираем всё до первой { и после последней }\n    const start = text.indexOf('{');\n    const end = text.lastIndexOf('}');\n    if (start !== -1 && end !== -1 && end > start) {\n      text = text.slice(start, end + 1);\n    }\n    \n    const seo = JSON.parse(text);\n    \n    const article = (seo.article || '').trim();\n    const faq = Array.isArray(seo.faq) ? seo.faq : [];\n    \n    // Пропускаем если article слишком короткий\n    if (article.length < 200) {\n      results.push({ json: { ok: 'false', url, error: 'article too short: ' + article.length } });\n      continue;\n    }\n    \n    results.push({\n      json: {\n        ok: 'true',\n        url,\n        title: (seo.title || '').slice(0, 200),\n        description: (seo.description || '').slice(0, 500),\n        h1: (seo.h1 || '').slice(0, 200),\n        article,\n        faq: JSON.stringify(faq),\n        related_queries: (seo.related_queries || '')\n      }\n    });\n  } catch(e) {\n    results.push({ json: { ok: 'false', url, error: ('parse: ' + e.message).slice(0,80) } });\n  }\n}\n\nreturn results;\n"
+          "jsCode": "\nconst claudeItems = $input.all();\nconst pgItems = $('PG: Pages without article or faq').all();\nconst results = [];\n\nfunction escapeSql(s) {\n  return (s || '').replace(/'/g, \"''\");\n}\n\nfor (let i = 0; i < claudeItems.length; i++) {\n  const resp = claudeItems[i].json;\n  const pg = pgItems[i] ? pgItems[i].json : {};\n  const url = pg.url || '';\n\n  if (resp.error) {\n    results.push({ json: { ok: 'false', url, error: (resp.error.message||'api error').slice(0,80) } });\n    continue;\n  }\n\n  try {\n    let text = (resp.content || [])[0]?.text || '';\n    text = text.replace(/^```json\\s*/i, '').replace(/^```\\s*/i, '').replace(/\\s*```$/i, '').trim();\n    const start = text.indexOf('{');\n    const end = text.lastIndexOf('}');\n    if (start !== -1 && end !== -1 && end > start) {\n      text = text.slice(start, end + 1);\n    }\n    \n    const seo = JSON.parse(text);\n    const article = (seo.article || '').trim();\n    const faq = Array.isArray(seo.faq) ? seo.faq : [];\n    \n    if (article.length < 200) {\n      results.push({ json: { ok: 'false', url, error: 'article too short: ' + article.length } });\n      continue;\n    }\n    \n    // Экранируем для PostgreSQL\n    results.push({\n      json: {\n        ok: 'true',\n        url: escapeSql(url),\n        title: escapeSql((seo.title || '').slice(0, 200)),\n        description: escapeSql((seo.description || '').slice(0, 500)),\n        h1: escapeSql((seo.h1 || '').slice(0, 200)),\n        article: escapeSql(article),\n        faq: escapeSql(JSON.stringify(faq)),\n        url_raw: url\n      }\n    });\n  } catch(e) {\n    results.push({ json: { ok: 'false', url, error: ('parse: ' + e.message).slice(0,80) } });\n  }\n}\n\nreturn results;\n"
         },
         "id": "parse",
         "name": "Parse Claude response",
@@ -527,10 +523,10 @@
     "autosaved": false,
     "workflowPublishHistory": [
       {
-        "createdAt": "2026-04-18T16:01:08.689Z",
-        "id": 3423,
+        "createdAt": "2026-04-18T16:03:50.474Z",
+        "id": 3425,
         "workflowId": "xPhhEHGFbGHjfZN7",
-        "versionId": "2d80e886-74b1-446c-a7b8-7a40b734f87e",
+        "versionId": "fb1a9707-a6cc-43d8-9205-a331c5d0a92c",
         "event": "activated",
         "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
       }
