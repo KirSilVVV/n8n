@@ -1,0 +1,601 @@
+{
+  "updatedAt": "2026-04-19T20:19:57.624Z",
+  "createdAt": "2026-04-19T20:19:57.624Z",
+  "id": "cegnUDFAxYFQmeM0",
+  "name": "WF-205-YW (SEO Weekly — 7 метрик Яндекса)",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * 1"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        300
+      ],
+      "name": "Schedule Mon 07:00",
+      "id": "sched-01"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.webmaster.yandex.net/v4/user/1763258173/hosts/https:gaming-goods.ru:443/search-urls/in-search/history",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "OAuth y0__xC93uTIBhj4yz4gnOmx0hYzxUi0DHhVAhks5kL9jLEFr6HyiQ"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        200,
+        300
+      ],
+      "name": "YW: In Search",
+      "id": "yw1-01"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.webmaster.yandex.net/v4/user/1763258173/hosts/https:gaming-goods.ru:443/search-urls/events/history",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "OAuth y0__xC93uTIBhj4yz4gnOmx0hYzxUi0DHhVAhks5kL9jLEFr6HyiQ"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        400,
+        300
+      ],
+      "name": "YW: Events",
+      "id": "yw2-01"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.webmaster.yandex.net/v4/user/1763258173/hosts/https:gaming-goods.ru:443/indexing/history",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "OAuth y0__xC93uTIBhj4yz4gnOmx0hYzxUi0DHhVAhks5kL9jLEFr6HyiQ"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        300
+      ],
+      "name": "YW: Crawl",
+      "id": "yw3-01"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.webmaster.yandex.net/v4/user/1763258173/hosts/https:gaming-goods.ru:443/search-queries/popular",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "OAuth y0__xC93uTIBhj4yz4gnOmx0hYzxUi0DHhVAhks5kL9jLEFr6HyiQ"
+            }
+          ]
+        },
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "order_by",
+              "value": "TOTAL_CLICKS"
+            },
+            {
+              "name": "query_indicator",
+              "value": "TOTAL_CLICKS"
+            },
+            {
+              "name": "query_indicator",
+              "value": "TOTAL_SHOWS"
+            },
+            {
+              "name": "query_indicator",
+              "value": "AVG_SHOW_POSITION"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        800,
+        300
+      ],
+      "name": "YW: Queries",
+      "id": "yw4-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst inSearch = $('YW: In Search').first().json;\nconst events = $('YW: Events').first().json;\nconst crawl = $('YW: Crawl').first().json;\nconst queries = $('YW: Queries').first().json;\n\nconst history = inSearch.history || [];\nconst latest = history[history.length - 1];\nconst weekAgo = history.length >= 8 ? history[history.length - 8] : history[0];\nconst monthAgo = history.length >= 30 ? history[history.length - 30] : history[0];\nconst pagesCurrent = latest.value;\nconst pagesWeekDelta = latest.value - weekAgo.value;\nconst pagesWeekPct = weekAgo.value > 0 ? (100 * pagesWeekDelta / weekAgo.value).toFixed(1) : '0';\nconst pagesMonthPct = monthAgo.value > 0 ? (100*(latest.value - monthAgo.value)/monthAgo.value).toFixed(1) : '0';\n\nconst inds = events.indicators || {};\nconst app = inds.APPEARED_IN_SEARCH || [];\nconst rem = inds.REMOVED_FROM_SEARCH || [];\nconst app7 = app.slice(-7).reduce((s,p)=>s+p.value, 0);\nconst rem7 = rem.slice(-7).reduce((s,p)=>s+p.value, 0);\nconst net7 = app7 - rem7;\n\nconst cInds = crawl.indicators || {};\nconst http200 = [];\nfor (const k in cInds) { if (k.indexOf('HTTP_2XX') >= 0) http200.push(...cInds[k]); }\nconst crawl7 = http200.slice(-7).reduce((s,p)=>s+p.value, 0);\n\nconst qRows = queries.queries || [];\nconst totalClicks = qRows.reduce((s,q)=>s+(q.indicators.TOTAL_CLICKS||0), 0);\nconst totalShows = qRows.reduce((s,q)=>s+(q.indicators.TOTAL_SHOWS||0), 0);\nconst ctr = totalShows > 0 ? (100*totalClicks/totalShows).toFixed(2) : '0';\n\n// Top-5 queries\nlet topQueries = '';\nfor (let i=0; i<Math.min(5, qRows.length); i++) {\n  const q = qRows[i];\n  const qt = q.query_text || '?';\n  const cl = Math.round(q.indicators.TOTAL_CLICKS || 0);\n  const sh = Math.round(q.indicators.TOTAL_SHOWS || 0);\n  const pos = (q.indicators.AVG_SHOW_POSITION || 0).toFixed(1);\n  topQueries += `• ${qt}: ${cl} кл / ${sh} пок, поз ${pos}\\n`;\n}\n\nconst today = new Date().toISOString().slice(0,10);\n\nlet msg = `📊 *SEO Недельный аудит Яндекса* \\\\· ${today}\\n\\n`;\nmsg += `*1. Страниц в индексе:* ${pagesCurrent.toLocaleString('ru-RU')}\\n`;\nmsg += `   неделя: ${pagesWeekDelta>=0?'+':''}${pagesWeekDelta.toLocaleString('ru-RU')} (${pagesWeekPct}%)\\n`;\nmsg += `   месяц: ${pagesMonthPct}%\\n`;\nmsg += `   Цель: 55 000+ (вернуть февральский пик)\\n\\n`;\n\nmsg += `*2. APPEARED/REMOVED (7 дн):*\\n`;\nmsg += `   Появилось: ${app7.toLocaleString('ru-RU')}\\n`;\nmsg += `   Удалено:   ${rem7.toLocaleString('ru-RU')}\\n`;\nmsg += `   Net:       ${net7>=0?'+':''}${net7.toLocaleString('ru-RU')}\\n`;\nmsg += `   Цель: стабильный плюс\\n\\n`;\n\nmsg += `*3. Обход краулером 200 OK (7 дн):* ${crawl7.toLocaleString('ru-RU')}\\n`;\nmsg += `   Среднее/день: ${Math.round(crawl7/7)}\\n`;\nmsg += `   Цель: 500+/день стабильно\\n\\n`;\n\nmsg += `*4. Показы (impressions, 7 дн):* ${totalShows.toLocaleString('ru-RU')}\\n`;\nmsg += `   Среднее/день: ${Math.round(totalShows/7)}\\n`;\nmsg += `   Цель: 1 000+/день\\n\\n`;\n\nmsg += `*5. Клики из поиска (7 дн):* ${totalClicks}\\n`;\nmsg += `   Среднее/день: ${(totalClicks/7).toFixed(1)}\\n`;\nmsg += `   Цель: 100+/день\\n\\n`;\n\nmsg += `*6. CTR:* ${ctr}%\\n`;\nmsg += `   Цель: 5-10%\\n\\n`;\n\nmsg += `*7. Конверсии SEO-трафика:* требуется GA4 audit\\n\\n`;\n\nmsg += `🔎 *Топ-5 запросов:*\\n${topQueries}`;\n\nreturn [{json:{chat_id: '83436260', text: msg, parse_mode: 'Markdown'}}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1000,
+        300
+      ],
+      "name": "Build SEO Message",
+      "id": "build-01"
+    },
+    {
+      "parameters": {
+        "chatId": "83436260",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1200,
+        300
+      ],
+      "name": "Telegram: SEO Report",
+      "id": "tg-01",
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      },
+      "webhookId": "7fb6cc27-07b3-4767-9927-30a891c1372b"
+    }
+  ],
+  "connections": {
+    "Schedule Mon 07:00": {
+      "main": [
+        [
+          {
+            "node": "YW: In Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YW: In Search": {
+      "main": [
+        [
+          {
+            "node": "YW: Events",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YW: Events": {
+      "main": [
+        [
+          {
+            "node": "YW: Crawl",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YW: Crawl": {
+      "main": [
+        [
+          {
+            "node": "YW: Queries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YW: Queries": {
+      "main": [
+        [
+          {
+            "node": "Build SEO Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build SEO Message": {
+      "main": [
+        [
+          {
+            "node": "Telegram: SEO Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": {
+    "node:Schedule Mon 07:00": {
+      "recurrenceRules": []
+    }
+  },
+  "meta": null,
+  "pinData": null,
+  "versionId": "323dfcab-7e48-4eca-a79b-d77325c0c2f5",
+  "activeVersionId": "323dfcab-7e48-4eca-a79b-d77325c0c2f5",
+  "versionCounter": 4,
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-04-19T20:19:57.624Z",
+      "createdAt": "2026-04-19T20:19:57.624Z",
+      "role": "workflow:owner",
+      "workflowId": "cegnUDFAxYFQmeM0",
+      "projectId": "jCp1XTf5YwVTzsQI",
+      "project": {
+        "updatedAt": "2026-02-27T19:24:12.401Z",
+        "createdAt": "2026-02-27T19:08:04.595Z",
+        "id": "jCp1XTf5YwVTzsQI",
+        "name": "Kirill Silvestrov <ceo@vvv.cash>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "creatorId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
+      }
+    }
+  ],
+  "tags": [],
+  "activeVersion": {
+    "updatedAt": "2026-04-19T20:19:57.630Z",
+    "createdAt": "2026-04-19T20:19:57.630Z",
+    "versionId": "323dfcab-7e48-4eca-a79b-d77325c0c2f5",
+    "workflowId": "cegnUDFAxYFQmeM0",
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {
+                "field": "cronExpression",
+                "expression": "0 7 * * 1"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          300
+        ],
+        "name": "Schedule Mon 07:00",
+        "id": "sched-01"
+      },
+      {
+        "parameters": {
+          "method": "GET",
+          "url": "https://api.webmaster.yandex.net/v4/user/1763258173/hosts/https:gaming-goods.ru:443/search-urls/in-search/history",
+          "options": {
+            "response": {
+              "response": {
+                "neverError": true
+              }
+            }
+          },
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "OAuth y0__xC93uTIBhj4yz4gnOmx0hYzxUi0DHhVAhks5kL9jLEFr6HyiQ"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          200,
+          300
+        ],
+        "name": "YW: In Search",
+        "id": "yw1-01"
+      },
+      {
+        "parameters": {
+          "method": "GET",
+          "url": "https://api.webmaster.yandex.net/v4/user/1763258173/hosts/https:gaming-goods.ru:443/search-urls/events/history",
+          "options": {
+            "response": {
+              "response": {
+                "neverError": true
+              }
+            }
+          },
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "OAuth y0__xC93uTIBhj4yz4gnOmx0hYzxUi0DHhVAhks5kL9jLEFr6HyiQ"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          400,
+          300
+        ],
+        "name": "YW: Events",
+        "id": "yw2-01"
+      },
+      {
+        "parameters": {
+          "method": "GET",
+          "url": "https://api.webmaster.yandex.net/v4/user/1763258173/hosts/https:gaming-goods.ru:443/indexing/history",
+          "options": {
+            "response": {
+              "response": {
+                "neverError": true
+              }
+            }
+          },
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "OAuth y0__xC93uTIBhj4yz4gnOmx0hYzxUi0DHhVAhks5kL9jLEFr6HyiQ"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          600,
+          300
+        ],
+        "name": "YW: Crawl",
+        "id": "yw3-01"
+      },
+      {
+        "parameters": {
+          "method": "GET",
+          "url": "https://api.webmaster.yandex.net/v4/user/1763258173/hosts/https:gaming-goods.ru:443/search-queries/popular",
+          "options": {
+            "response": {
+              "response": {
+                "neverError": true
+              }
+            }
+          },
+          "sendHeaders": true,
+          "headerParameters": {
+            "parameters": [
+              {
+                "name": "Authorization",
+                "value": "OAuth y0__xC93uTIBhj4yz4gnOmx0hYzxUi0DHhVAhks5kL9jLEFr6HyiQ"
+              }
+            ]
+          },
+          "sendQuery": true,
+          "queryParameters": {
+            "parameters": [
+              {
+                "name": "order_by",
+                "value": "TOTAL_CLICKS"
+              },
+              {
+                "name": "query_indicator",
+                "value": "TOTAL_CLICKS"
+              },
+              {
+                "name": "query_indicator",
+                "value": "TOTAL_SHOWS"
+              },
+              {
+                "name": "query_indicator",
+                "value": "AVG_SHOW_POSITION"
+              }
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          800,
+          300
+        ],
+        "name": "YW: Queries",
+        "id": "yw4-01"
+      },
+      {
+        "parameters": {
+          "jsCode": "\nconst inSearch = $('YW: In Search').first().json;\nconst events = $('YW: Events').first().json;\nconst crawl = $('YW: Crawl').first().json;\nconst queries = $('YW: Queries').first().json;\n\nconst history = inSearch.history || [];\nconst latest = history[history.length - 1];\nconst weekAgo = history.length >= 8 ? history[history.length - 8] : history[0];\nconst monthAgo = history.length >= 30 ? history[history.length - 30] : history[0];\nconst pagesCurrent = latest.value;\nconst pagesWeekDelta = latest.value - weekAgo.value;\nconst pagesWeekPct = weekAgo.value > 0 ? (100 * pagesWeekDelta / weekAgo.value).toFixed(1) : '0';\nconst pagesMonthPct = monthAgo.value > 0 ? (100*(latest.value - monthAgo.value)/monthAgo.value).toFixed(1) : '0';\n\nconst inds = events.indicators || {};\nconst app = inds.APPEARED_IN_SEARCH || [];\nconst rem = inds.REMOVED_FROM_SEARCH || [];\nconst app7 = app.slice(-7).reduce((s,p)=>s+p.value, 0);\nconst rem7 = rem.slice(-7).reduce((s,p)=>s+p.value, 0);\nconst net7 = app7 - rem7;\n\nconst cInds = crawl.indicators || {};\nconst http200 = [];\nfor (const k in cInds) { if (k.indexOf('HTTP_2XX') >= 0) http200.push(...cInds[k]); }\nconst crawl7 = http200.slice(-7).reduce((s,p)=>s+p.value, 0);\n\nconst qRows = queries.queries || [];\nconst totalClicks = qRows.reduce((s,q)=>s+(q.indicators.TOTAL_CLICKS||0), 0);\nconst totalShows = qRows.reduce((s,q)=>s+(q.indicators.TOTAL_SHOWS||0), 0);\nconst ctr = totalShows > 0 ? (100*totalClicks/totalShows).toFixed(2) : '0';\n\n// Top-5 queries\nlet topQueries = '';\nfor (let i=0; i<Math.min(5, qRows.length); i++) {\n  const q = qRows[i];\n  const qt = q.query_text || '?';\n  const cl = Math.round(q.indicators.TOTAL_CLICKS || 0);\n  const sh = Math.round(q.indicators.TOTAL_SHOWS || 0);\n  const pos = (q.indicators.AVG_SHOW_POSITION || 0).toFixed(1);\n  topQueries += `• ${qt}: ${cl} кл / ${sh} пок, поз ${pos}\\n`;\n}\n\nconst today = new Date().toISOString().slice(0,10);\n\nlet msg = `📊 *SEO Недельный аудит Яндекса* \\\\· ${today}\\n\\n`;\nmsg += `*1. Страниц в индексе:* ${pagesCurrent.toLocaleString('ru-RU')}\\n`;\nmsg += `   неделя: ${pagesWeekDelta>=0?'+':''}${pagesWeekDelta.toLocaleString('ru-RU')} (${pagesWeekPct}%)\\n`;\nmsg += `   месяц: ${pagesMonthPct}%\\n`;\nmsg += `   Цель: 55 000+ (вернуть февральский пик)\\n\\n`;\n\nmsg += `*2. APPEARED/REMOVED (7 дн):*\\n`;\nmsg += `   Появилось: ${app7.toLocaleString('ru-RU')}\\n`;\nmsg += `   Удалено:   ${rem7.toLocaleString('ru-RU')}\\n`;\nmsg += `   Net:       ${net7>=0?'+':''}${net7.toLocaleString('ru-RU')}\\n`;\nmsg += `   Цель: стабильный плюс\\n\\n`;\n\nmsg += `*3. Обход краулером 200 OK (7 дн):* ${crawl7.toLocaleString('ru-RU')}\\n`;\nmsg += `   Среднее/день: ${Math.round(crawl7/7)}\\n`;\nmsg += `   Цель: 500+/день стабильно\\n\\n`;\n\nmsg += `*4. Показы (impressions, 7 дн):* ${totalShows.toLocaleString('ru-RU')}\\n`;\nmsg += `   Среднее/день: ${Math.round(totalShows/7)}\\n`;\nmsg += `   Цель: 1 000+/день\\n\\n`;\n\nmsg += `*5. Клики из поиска (7 дн):* ${totalClicks}\\n`;\nmsg += `   Среднее/день: ${(totalClicks/7).toFixed(1)}\\n`;\nmsg += `   Цель: 100+/день\\n\\n`;\n\nmsg += `*6. CTR:* ${ctr}%\\n`;\nmsg += `   Цель: 5-10%\\n\\n`;\n\nmsg += `*7. Конверсии SEO-трафика:* требуется GA4 audit\\n\\n`;\n\nmsg += `🔎 *Топ-5 запросов:*\\n${topQueries}`;\n\nreturn [{json:{chat_id: '83436260', text: msg, parse_mode: 'Markdown'}}];\n"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1000,
+          300
+        ],
+        "name": "Build SEO Message",
+        "id": "build-01"
+      },
+      {
+        "parameters": {
+          "chatId": "83436260",
+          "text": "={{ $json.text }}",
+          "additionalFields": {
+            "parse_mode": "Markdown"
+          }
+        },
+        "type": "n8n-nodes-base.telegram",
+        "typeVersion": 1.2,
+        "position": [
+          1200,
+          300
+        ],
+        "name": "Telegram: SEO Report",
+        "id": "tg-01",
+        "credentials": {
+          "telegramApi": {
+            "id": "IjoBfA5jgnMrU9qV",
+            "name": "GG Telegram Bot"
+          }
+        },
+        "webhookId": "7fb6cc27-07b3-4767-9927-30a891c1372b"
+      }
+    ],
+    "connections": {
+      "Schedule Mon 07:00": {
+        "main": [
+          [
+            {
+              "node": "YW: In Search",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "YW: In Search": {
+        "main": [
+          [
+            {
+              "node": "YW: Events",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "YW: Events": {
+        "main": [
+          [
+            {
+              "node": "YW: Crawl",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "YW: Crawl": {
+        "main": [
+          [
+            {
+              "node": "YW: Queries",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "YW: Queries": {
+        "main": [
+          [
+            {
+              "node": "Build SEO Message",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Build SEO Message": {
+        "main": [
+          [
+            {
+              "node": "Telegram: SEO Report",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false,
+    "workflowPublishHistory": [
+      {
+        "createdAt": "2026-04-19T20:19:57.881Z",
+        "id": 14107,
+        "workflowId": "cegnUDFAxYFQmeM0",
+        "versionId": "323dfcab-7e48-4eca-a79b-d77325c0c2f5",
+        "event": "activated",
+        "userId": "50eeaeaf-1628-40cf-b2a8-89a7dcf2d74e"
+      }
+    ]
+  }
+}
