@@ -1,0 +1,645 @@
+{
+  "name": "WF-R-ALERT-01 Problem SKUs Weekly",
+  "nodes": [
+    {
+      "id": "sched",
+      "name": "Friday 10:00 MSK",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * 5"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "init",
+      "name": "Init Dates",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const today = new Date();\nconst d7 = new Date(today.getTime() - 7*86400*1000);\nconst fmt = d => `${String(d.getDate()).padStart(2,'0')}-${String(d.getMonth()+1).padStart(2,'0')}-${d.getFullYear()}`;\nreturn [{json: {fromDate: fmt(d7), toDate: fmt(today), isoFrom: d7.toISOString().slice(0,10), isoTo: today.toISOString().slice(0,10)}}];"
+      }
+    },
+    {
+      "id": "http1",
+      "name": "YM P1",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        0
+      ],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.partner.market.yandex.ru/campaigns/149050735/orders",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fromDate",
+              "value": "={{ $json.fromDate }}"
+            },
+            {
+              "name": "toDate",
+              "value": "={{ $json.toDate }}"
+            },
+            {
+              "name": "page",
+              "value": "1"
+            },
+            {
+              "name": "pageSize",
+              "value": "50"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Api-Key",
+              "value": "ACMA:pmewbhgmRJxBawzIeZbxV9wrKmYpU2K9A9NvuY9I:79d803d1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      }
+    },
+    {
+      "id": "http2",
+      "name": "YM P2",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        660,
+        0
+      ],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.partner.market.yandex.ru/campaigns/149050735/orders",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fromDate",
+              "value": "={{ $('Init Dates').item.json.fromDate }}"
+            },
+            {
+              "name": "toDate",
+              "value": "={{ $('Init Dates').item.json.toDate }}"
+            },
+            {
+              "name": "page",
+              "value": "2"
+            },
+            {
+              "name": "pageSize",
+              "value": "50"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Api-Key",
+              "value": "ACMA:pmewbhgmRJxBawzIeZbxV9wrKmYpU2K9A9NvuY9I:79d803d1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      }
+    },
+    {
+      "id": "http3",
+      "name": "YM P3",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.partner.market.yandex.ru/campaigns/149050735/orders",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fromDate",
+              "value": "={{ $('Init Dates').item.json.fromDate }}"
+            },
+            {
+              "name": "toDate",
+              "value": "={{ $('Init Dates').item.json.toDate }}"
+            },
+            {
+              "name": "page",
+              "value": "3"
+            },
+            {
+              "name": "pageSize",
+              "value": "50"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Api-Key",
+              "value": "ACMA:pmewbhgmRJxBawzIeZbxV9wrKmYpU2K9A9NvuY9I:79d803d1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      }
+    },
+    {
+      "id": "http4",
+      "name": "YM P4",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1100,
+        0
+      ],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.partner.market.yandex.ru/campaigns/149050735/orders",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fromDate",
+              "value": "={{ $('Init Dates').item.json.fromDate }}"
+            },
+            {
+              "name": "toDate",
+              "value": "={{ $('Init Dates').item.json.toDate }}"
+            },
+            {
+              "name": "page",
+              "value": "4"
+            },
+            {
+              "name": "pageSize",
+              "value": "50"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Api-Key",
+              "value": "ACMA:pmewbhgmRJxBawzIeZbxV9wrKmYpU2K9A9NvuY9I:79d803d1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      }
+    },
+    {
+      "id": "http5",
+      "name": "YM P5",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1320,
+        0
+      ],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.partner.market.yandex.ru/campaigns/149050735/orders",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fromDate",
+              "value": "={{ $('Init Dates').item.json.fromDate }}"
+            },
+            {
+              "name": "toDate",
+              "value": "={{ $('Init Dates').item.json.toDate }}"
+            },
+            {
+              "name": "page",
+              "value": "5"
+            },
+            {
+              "name": "pageSize",
+              "value": "50"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Api-Key",
+              "value": "ACMA:pmewbhgmRJxBawzIeZbxV9wrKmYpU2K9A9NvuY9I:79d803d1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      }
+    },
+    {
+      "id": "http6",
+      "name": "YM P6",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        0
+      ],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.partner.market.yandex.ru/campaigns/149050735/orders",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fromDate",
+              "value": "={{ $('Init Dates').item.json.fromDate }}"
+            },
+            {
+              "name": "toDate",
+              "value": "={{ $('Init Dates').item.json.toDate }}"
+            },
+            {
+              "name": "page",
+              "value": "6"
+            },
+            {
+              "name": "pageSize",
+              "value": "50"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Api-Key",
+              "value": "ACMA:pmewbhgmRJxBawzIeZbxV9wrKmYpU2K9A9NvuY9I:79d803d1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      }
+    },
+    {
+      "id": "http7",
+      "name": "YM P7",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1760,
+        0
+      ],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.partner.market.yandex.ru/campaigns/149050735/orders",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fromDate",
+              "value": "={{ $('Init Dates').item.json.fromDate }}"
+            },
+            {
+              "name": "toDate",
+              "value": "={{ $('Init Dates').item.json.toDate }}"
+            },
+            {
+              "name": "page",
+              "value": "7"
+            },
+            {
+              "name": "pageSize",
+              "value": "50"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Api-Key",
+              "value": "ACMA:pmewbhgmRJxBawzIeZbxV9wrKmYpU2K9A9NvuY9I:79d803d1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      }
+    },
+    {
+      "id": "http8",
+      "name": "YM P8",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        0
+      ],
+      "continueOnFail": true,
+      "parameters": {
+        "method": "GET",
+        "url": "=https://api.partner.market.yandex.ru/campaigns/149050735/orders",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "fromDate",
+              "value": "={{ $('Init Dates').item.json.fromDate }}"
+            },
+            {
+              "name": "toDate",
+              "value": "={{ $('Init Dates').item.json.toDate }}"
+            },
+            {
+              "name": "page",
+              "value": "8"
+            },
+            {
+              "name": "pageSize",
+              "value": "50"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Api-Key",
+              "value": "ACMA:pmewbhgmRJxBawzIeZbxV9wrKmYpU2K9A9NvuY9I:79d803d1"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "retry": {
+            "maxTries": 3,
+            "waitBetweenTries": 3000
+          }
+        }
+      }
+    },
+    {
+      "id": "analyze",
+      "name": "Analyze Problem SKUs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const pageNodes = ['YM P1','YM P2','YM P3','YM P4','YM P5','YM P6','YM P7','YM P8'];\nlet allOrders = [];\nlet pagesFetched = 0;\nlet errors = [];\nfor (const p of pageNodes) {\n  try {\n    const arr = $(p).all();\n    for (const it of arr) {\n      const body = it.json || {};\n      if (body && Array.isArray(body.orders) && body.orders.length > 0) {\n        allOrders = allOrders.concat(body.orders);\n        pagesFetched++;\n      } else if (body && body.errors) {\n        errors.push(p + ': ' + JSON.stringify(body.errors).slice(0,100));\n      }\n    }\n  } catch(e) { errors.push(p + ': ' + e.message); }\n}\nconst fromDate = $('Init Dates').item.json.isoFrom;\nconst toDate   = $('Init Dates').item.json.isoTo;\nconst seen = new Set(); const uniq = [];\nfor (const o of allOrders) { if (!seen.has(o.id)) { seen.add(o.id); uniq.push(o); } }\nconst skuStats = {};\nfor (const o of uniq) {\n  const cancelled = (o.status === 'CANCELLED');\n  for (const it of (o.items || [])) {\n    const sku = it.offerId;\n    if (!skuStats[sku]) skuStats[sku] = { total:0, cancelled:0, delivered:0, title: it.offerName || sku, prices: [] };\n    skuStats[sku].total++;\n    if (cancelled) skuStats[sku].cancelled++; else skuStats[sku].delivered++;\n    skuStats[sku].prices.push(Number(it.buyerPrice) || 0);\n  }\n}\nconst problems = [];\nfor (const [sku, s] of Object.entries(skuStats)) {\n  if (s.total >= 5 && (s.cancelled / s.total) >= 0.30) {\n    const avgPrice = s.prices.length ? s.prices.reduce((a,b)=>a+b,0)/s.prices.length : 0;\n    problems.push({ sku, title: s.title, cancelRate: s.cancelled/s.total, cancelled: s.cancelled, total: s.total, delivered: s.delivered, avgPrice });\n  }\n}\nproblems.sort((a,b) => b.cancelRate - a.cancelRate || b.total - a.total);\nconst esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nconst period = fromDate + ' -> ' + toDate;\nlet text;\nif (problems.length === 0) {\n  text = '\\u2705 <b>Problem SKUs Weekly</b>\\n<i>' + period + '</i>\\n\\n\\u0417\\u0430 \\u043d\\u0435\\u0434\\u0435\\u043b\\u044e \\u043d\\u0435\\u0442 SKU \\u0441 \\u22655 \\u0437\\u0430\\u043a\\u0430\\u0437\\u0430\\u043c\\u0438 \\u0438 \\u226530% \\u043e\\u0442\\u043c\\u0435\\u043d.\\n\\n\\u041e\\u0431\\u0440\\u0430\\u0431\\u043e\\u0442\\u0430\\u043d\\u043e: ' + uniq.length + ' \\u0437\\u0430\\u043a\\u0430\\u0437\\u043e\\u0432, ' + pagesFetched + ' \\u0441\\u0442\\u0440\\u0430\\u043d\\u0438\\u0446 API.';\n} else {\n  const lines = problems.slice(0, 15).map(p =>\n    '\\u2022 <b>' + esc(p.sku) + '</b> \\u2014 <b>' + Math.round(p.cancelRate*100) + '%</b> \\u043e\\u0442\\u043c\\u0435\\u043d\\u0430 (' + p.cancelled + '/' + p.total + ')\\n  <i>' + esc((p.title||'').slice(0,90)) + '</i>\\n  \\u20bd' + Math.round(p.avgPrice) + ' \\u0441\\u0440.\\u0446\\u0435\\u043d\\u0430'\n  ).join('\\n\\n');\n  text = '\\ud83d\\udea8 <b>Problem SKUs Weekly</b>\\n<i>' + period + '</i>\\n\\n\\u041d\\u0430\\u0439\\u0434\\u0435\\u043d\\u043e ' + problems.length + ' SKU \\u0441 \\u22655 \\u0437\\u0430\\u043a\\u0430\\u0437\\u0430\\u043c\\u0438 \\u0438 \\u226530% \\u043e\\u0442\\u043c\\u0435\\u043d:\\n\\n' + lines + '\\n\\n<i>\\u0412\\u0441\\u0435\\u0433\\u043e \\u043e\\u0431\\u0440\\u0430\\u0431\\u043e\\u0442\\u0430\\u043d\\u043e: ' + uniq.length + ' \\u0437\\u0430\\u043a\\u0430\\u0437\\u043e\\u0432, ' + pagesFetched + ' \\u0441\\u0442\\u0440\\u0430\\u043d\\u0438\\u0446</i>\\n\\n\\u2192 \\u041c\\u0430\\u043a\\u0441\\u0438\\u043c: \\u043f\\u0440\\u043e\\u0432\\u0435\\u0440\\u044c \\u044d\\u0442\\u0438 SKU \\u0432 YM-\\u043a\\u0430\\u0431\\u0438\\u043d\\u0435\\u0442\\u0435, \\u0434\\u0435\\u0430\\u043a\\u0442\\u0438\\u0432\\u0438\\u0440\\u0443\\u0439 \\u0435\\u0441\\u043b\\u0438 \\u043a\\u043b\\u044e\\u0447\\u0438 \\u043d\\u0435\\u0432\\u0430\\u043b\\u0438\\u0434\\u043d\\u044b\\u0435 \\u0438\\u043b\\u0438 \\u0442\\u043e\\u0432\\u0430\\u0440\\u044b region-locked.';\n}\nreturn [{json: {text, problems_count: problems.length, orders_analyzed: uniq.length, pages: pagesFetched, problems, errors}}];"
+      }
+    },
+    {
+      "id": "tg",
+      "name": "Telegram: Send Alert",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        2420,
+        0
+      ],
+      "parameters": {
+        "chatId": "83436260",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    },
+    {
+      "id": "wh_manual",
+      "name": "Manual Trigger (webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "wf-r-alert-01-run",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf-r-alert-01-run",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Friday 10:00 MSK": {
+      "main": [
+        [
+          {
+            "node": "Init Dates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Init Dates": {
+      "main": [
+        [
+          {
+            "node": "YM P1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YM P1": {
+      "main": [
+        [
+          {
+            "node": "YM P2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YM P2": {
+      "main": [
+        [
+          {
+            "node": "YM P3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YM P3": {
+      "main": [
+        [
+          {
+            "node": "YM P4",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YM P4": {
+      "main": [
+        [
+          {
+            "node": "YM P5",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YM P5": {
+      "main": [
+        [
+          {
+            "node": "YM P6",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YM P6": {
+      "main": [
+        [
+          {
+            "node": "YM P7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YM P7": {
+      "main": [
+        [
+          {
+            "node": "YM P8",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "YM P8": {
+      "main": [
+        [
+          {
+            "node": "Analyze Problem SKUs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Problem SKUs": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Send Alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger (webhook)": {
+      "main": [
+        [
+          {
+            "node": "Init Dates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
