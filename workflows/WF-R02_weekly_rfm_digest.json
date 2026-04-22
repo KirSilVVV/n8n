@@ -1,0 +1,210 @@
+{
+  "name": "WF-R02 Weekly RFM Digest",
+  "nodes": [
+    {
+      "id": "sched",
+      "name": "Monday 09:00 MSK",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wh_manual",
+      "name": "Manual Trigger (webhook)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "wf-r02-rfm-run",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf-r02-rfm-run",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "pg_rfm",
+      "name": "PG: RFM Segments",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "mBKMS6IXC9Jf5DwC",
+          "name": "GG Production n8n_reader (5433 disable SSL)"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(json_agg(t), '[]'::json) as result FROM (\n  WITH buyer AS (\n    SELECT o.user_id,\n      MAX(o.created_at) AS last_purchase,\n      COUNT(*) AS frequency,\n      SUM(o.total_amount)/100.0 AS monetary_eur,\n      EXTRACT(DAY FROM NOW() - MAX(o.created_at))::int AS recency_days\n    FROM orders o\n    WHERE o.status='completed' AND o.user_id IS NOT NULL \n      AND o.channel='web' AND o.total_amount > 0\n    GROUP BY o.user_id\n  ),\n  nutaku_users AS (\n    SELECT DISTINCT o.user_id\n    FROM orders o\n    JOIN order_items oi ON oi.order_id=o.id\n    JOIN products p ON p.id=oi.product_id\n    WHERE o.status='completed' AND o.channel='web' AND p.brand='Nutaku'\n  ),\n  scored AS (\n    SELECT b.*,\n      (nu.user_id IS NOT NULL) AS is_nutaku,\n      NTILE(5) OVER (ORDER BY b.recency_days DESC) AS r,\n      NTILE(5) OVER (ORDER BY b.frequency) AS f,\n      NTILE(5) OVER (ORDER BY b.monetary_eur) AS m\n    FROM buyer b\n    LEFT JOIN nutaku_users nu ON nu.user_id = b.user_id\n  ),\n  segmented AS (\n    SELECT *,\n      CASE\n        WHEN r>=4 AND f>=4 THEN 'Champions'\n        WHEN r>=3 AND f>=3 THEN 'Loyal'\n        WHEN r>=4 AND f<=2 THEN 'New/Recent'\n        WHEN r<=2 AND f>=4 THEN 'Cannot Lose'\n        WHEN r<=2 AND f>=3 THEN 'At Risk'\n        WHEN r<=1 AND f<=1 THEN 'Lost'\n        ELSE 'Potential'\n      END AS segment\n    FROM scored\n  )\n  SELECT segment,\n    COUNT(*) AS users,\n    COUNT(*) FILTER (WHERE is_nutaku) AS nutaku_users,\n    ROUND(AVG(monetary_eur)::numeric, 2) AS avg_ltv,\n    ROUND(SUM(monetary_eur)::numeric) AS gmv,\n    ROUND(AVG(frequency)::numeric, 1) AS avg_orders,\n    ROUND(AVG(recency_days)::numeric, 0) AS avg_silent\n  FROM segmented\n  GROUP BY segment\n  ORDER BY gmv DESC\n) t"
+      }
+    },
+    {
+      "id": "pg_weekly",
+      "name": "PG: Weekly Delta",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "mBKMS6IXC9Jf5DwC",
+          "name": "GG Production n8n_reader (5433 disable SSL)"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(json_agg(t), '[]'::json) as result FROM (\n  WITH recent AS (\n    SELECT o.user_id, COUNT(*) as orders_7d, SUM(o.total_amount)/100.0 as gmv_7d\n    FROM orders o\n    WHERE o.status='completed' AND o.channel='web' AND o.total_amount > 0\n      AND o.created_at >= NOW() - INTERVAL '7 days'\n    GROUP BY o.user_id\n  ),\n  prior AS (\n    SELECT o.user_id, COUNT(*) as orders_prior\n    FROM orders o\n    WHERE o.status='completed' AND o.channel='web' AND o.total_amount > 0\n      AND o.created_at < NOW() - INTERVAL '7 days'\n    GROUP BY o.user_id\n  )\n  SELECT \n    COUNT(*) FILTER (WHERE r.user_id IS NOT NULL AND p.user_id IS NULL) as new_buyers_7d,\n    COUNT(*) FILTER (WHERE r.user_id IS NOT NULL AND p.user_id IS NOT NULL) as returning_7d,\n    COUNT(*) FILTER (WHERE r.user_id IS NOT NULL) as active_7d,\n    ROUND(SUM(r.gmv_7d) FILTER (WHERE r.user_id IS NOT NULL)::numeric) as gmv_7d_eur\n  FROM recent r\n  FULL OUTER JOIN prior p ON p.user_id = r.user_id\n) t"
+      }
+    },
+    {
+      "id": "pg_atrisk",
+      "name": "PG: At Risk Top",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        660,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "mBKMS6IXC9Jf5DwC",
+          "name": "GG Production n8n_reader (5433 disable SSL)"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(json_agg(t), '[]'::json) as result FROM (\n  WITH b AS (\n    SELECT o.user_id,\n      COUNT(*) as orders,\n      SUM(o.total_amount)/100.0 as ltv,\n      (NOW()::date - MAX(o.created_at)::date) as silent\n    FROM orders o\n    WHERE o.status='completed' AND o.user_id IS NOT NULL \n      AND o.channel='web' AND o.total_amount > 0\n    GROUP BY o.user_id\n  )\n  SELECT \n    LEFT(u.email, 35) as email,\n    u.telegram_id IS NOT NULL AS tg,\n    b.orders,\n    ROUND(b.ltv::numeric) as ltv,\n    b.silent\n  FROM b\n  JOIN users u ON u.id = b.user_id\n  WHERE b.ltv >= 200\n    AND b.silent BETWEEN 30 AND 180\n    AND b.orders >= 5\n  ORDER BY b.ltv DESC\n  LIMIT 10\n) t"
+      }
+    },
+    {
+      "id": "format",
+      "name": "Format Digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "jsCode": "// Parse PG outputs (each returns {result: JSON array or string})\nfunction parseResult(x) {\n  let r = x?.result;\n  if (typeof r === 'string') { try { r = JSON.parse(r); } catch(e) { r = []; } }\n  return Array.isArray(r) ? r : [];\n}\n\nconst rfm = parseResult($('PG: RFM Segments').item.json);\nconst wk = parseResult($('PG: Weekly Delta').item.json)[0] || {};\nconst atrisk = parseResult($('PG: At Risk Top').item.json);\n\nconst esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\nconst d = new Date();\nconst weekTo = d.toISOString().slice(0,10);\nconst d7 = new Date(d.getTime() - 7*86400*1000).toISOString().slice(0,10);\n\n// Build RFM section\nconst totalUsers = rfm.reduce((s,r) => s + Number(r.users||0), 0);\nconst totalGmv = rfm.reduce((s,r) => s + Number(r.gmv||0), 0);\n\nconst emoji = {\n  'Champions': '\\ud83c\\udfc6',\n  'Loyal': '\\ud83d\\udc9a',\n  'New/Recent': '\\u2728',\n  'Cannot Lose': '\\u26a0\\ufe0f',\n  'At Risk': '\\ud83d\\udd34',\n  'Potential': '\\ud83c\\udf31',\n  'Lost': '\\u26ab\\ufe0f'\n};\n\nconst rfmLines = rfm.map(r => {\n  const em = emoji[r.segment] || '\\u25cf';\n  const gmvShare = totalGmv > 0 ? Math.round(Number(r.gmv)/totalGmv*100) : 0;\n  const nutakuShare = r.users > 0 ? Math.round(Number(r.nutaku_users)/Number(r.users)*100) : 0;\n  return em + ' <b>' + r.segment + '</b>: ' + r.users + ' \\u044e\\u0437\\u0435\\u0440\\u043e\\u0432 (' + nutakuShare + '% Nutaku), LTV \\u20ac' + r.avg_ltv + ', \\u0432\\u044b\\u0440\\u0443\\u0447\\u043a\\u0430 \\u20ac' + r.gmv + ' (' + gmvShare + '%)';\n}).join('\\n');\n\n// Weekly activity\nconst weeklyLine = '\\ud83d\\udcca <b>\\u041d\\u0435\\u0434\\u0435\\u043b\\u044f:</b> ' + (wk.active_7d||0) + ' \\u0430\\u043a\\u0442\\u0438\\u0432\\u043d\\u044b\\u0445 \\u043f\\u043e\\u043a\\u0443\\u043f\\u0430\\u0442\\u0435\\u043b\\u0435\\u0439 (' + (wk.new_buyers_7d||0) + ' \\u043d\\u043e\\u0432\\u044b\\u0445, ' + (wk.returning_7d||0) + ' \\u0432\\u0435\\u0440\\u043d\\u0443\\u0432\\u0448\\u0438\\u0445\\u0441\\u044f), \\u20ac' + (wk.gmv_7d_eur||0);\n\n// At Risk list\nlet atriskBlock = '';\nif (atrisk.length > 0) {\n  const lines = atrisk.slice(0, 10).map((r, i) => {\n    const tg = r.tg ? '\\ud83d\\udce9' : '\\u2063';\n    return (i+1) + '. ' + tg + ' <code>' + esc(r.email || '(no email)') + '</code> \\u2014 <b>\\u20ac' + r.ltv + '</b> LTV, ' + r.orders + ' \\u0437\\u0430\\u043a\\u0430\\u0437\\u043e\\u0432, \\u043c\\u043e\\u043b\\u0447\\u0438\\u0442 ' + r.silent + ' \\u0434\\u043d.';\n  }).join('\\n');\n  atriskBlock = '\\n\\n\\ud83c\\udfaf <b>At Risk Champions \\u2014 \\u043a\\u0430\\u043d\\u0434\\u0438\\u0434\\u0430\\u0442\\u044b \\u043d\\u0430 winback</b>\\n' + lines;\n}\n\nconst text = '\\ud83d\\udcca <b>RFM Weekly Digest</b>\\n<i>' + d7 + ' \\u2192 ' + weekTo + '</i>\\n\\n' + weeklyLine + '\\n\\n<b>\\u0412\\u0441\\u0435\\u0433\\u043e \\u043f\\u043e\\u043a\\u0443\\u043f\\u0430\\u0442\\u0435\\u043b\\u0435\\u0439 \\u0432 \\u0431\\u0430\\u0437\\u0435:</b> ' + totalUsers + ' \\u043d\\u0430 \\u20ac' + totalGmv + ' LTV\\n\\n' + rfmLines + atriskBlock;\n\nreturn [{json: {text, rfm, weekly: wk, atrisk}}];"
+      }
+    },
+    {
+      "id": "tg",
+      "name": "Telegram: RFM Digest",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        0
+      ],
+      "parameters": {
+        "chatId": "83436260",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Monday 09:00 MSK": {
+      "main": [
+        [
+          {
+            "node": "PG: RFM Segments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger (webhook)": {
+      "main": [
+        [
+          {
+            "node": "PG: RFM Segments",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG: RFM Segments": {
+      "main": [
+        [
+          {
+            "node": "PG: Weekly Delta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG: Weekly Delta": {
+      "main": [
+        [
+          {
+            "node": "PG: At Risk Top",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG: At Risk Top": {
+      "main": [
+        [
+          {
+            "node": "Format Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Digest": {
+      "main": [
+        [
+          {
+            "node": "Telegram: RFM Digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
