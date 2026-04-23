@@ -1,0 +1,191 @@
+{
+  "name": "SQL-Safety-Check-001 Weekly New Problem SKUs",
+  "nodes": [
+    {
+      "id": "sched",
+      "name": "Thursday 10:00 MSK",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * 4"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wh",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "sql-safety-check-001-run",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sql-safety-check-001-run",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "pg",
+      "name": "PG: Safety Check",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "mBKMS6IXC9Jf5DwC",
+          "name": "GG Production n8n_reader (5433 disable SSL)"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(json_agg(t), '[]'::json) as result FROM (\n  WITH recent_7d AS (\n    -- \u0421\u0435\u043c\u044c \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0445 \u0434\u043d\u0435\u0439: \u043a\u043e\u043d\u0442\u0440\u043e\u043b\u044c\u043d\u0430\u044f \u0442\u043e\u0447\u043a\u0430\n    SELECT\n      p.id as pid,\n      COALESCE(p.ticker, p.slug) as sku,\n      p.name, p.brand, p.is_active, p.stock_quantity,\n      COUNT(*) as total_7d,\n      COUNT(*) FILTER (WHERE o.status LIKE 'cancelled%') as cancelled_7d,\n      MAX(o.created_at)::date as last_attempt\n    FROM order_items oi\n    JOIN orders o ON o.id = oi.order_id\n    JOIN products p ON p.id = oi.product_id\n    WHERE o.created_at >= NOW() - INTERVAL '7 days'\n      AND o.channel = 'web'\n    GROUP BY p.id, p.ticker, p.slug, p.name, p.brand, p.is_active, p.stock_quantity\n    HAVING COUNT(*) >= 5 \n       AND COUNT(*) FILTER (WHERE o.status LIKE 'cancelled%')::float / NULLIF(COUNT(*),0) >= 0.50\n  ),\n  prior_30d AS (\n    -- \u041f\u0440\u0435\u0434\u044b\u0434\u0443\u0449\u0438\u0435 30 \u0434\u043d\u0435\u0439 (\u0431\u0435\u0437 \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0445 7): \u044d\u0442\u0430\u043b\u043e\u043d\n    SELECT\n      p.id as pid,\n      COUNT(*) as total_prior,\n      COUNT(*) FILTER (WHERE o.status LIKE 'cancelled%') as cancelled_prior,\n      COALESCE(\n        ROUND(100.0 * COUNT(*) FILTER (WHERE o.status LIKE 'cancelled%') / NULLIF(COUNT(*),0), 1),\n        0\n      ) as prior_cancel_rate\n    FROM order_items oi\n    JOIN orders o ON o.id = oi.order_id\n    JOIN products p ON p.id = oi.product_id\n    WHERE o.created_at >= NOW() - INTERVAL '37 days'\n      AND o.created_at < NOW() - INTERVAL '7 days'\n      AND o.channel = 'web'\n    GROUP BY p.id\n  )\n  SELECT \n    r.sku, r.name, r.brand, r.is_active, r.stock_quantity,\n    r.total_7d, r.cancelled_7d,\n    ROUND(100.0 * r.cancelled_7d / r.total_7d, 1) as cancel_rate_7d,\n    COALESCE(p.total_prior, 0) as total_prior,\n    COALESCE(p.cancel_rate_prior, 0) as cancel_rate_prior,\n    r.last_attempt,\n    -- \u0424\u043b\u0430\u0433\u0438 \"\u0432\u043f\u0435\u0440\u0432\u044b\u0435\"\n    CASE \n      WHEN p.pid IS NULL THEN 'new_problem'  -- \u043d\u0435\u0442 \u0438\u0441\u0442\u043e\u0440\u0438\u0438 - \u043d\u043e\u0432\u044b\u0439 \u0442\u043e\u0432\u0430\u0440\n      WHEN p.cancel_rate_prior < 50 THEN 'newly_crossed_50'  -- \u0440\u0430\u043d\u044c\u0448\u0435 \u0431\u044b\u043b < 50%, \u0441\u0435\u0439\u0447\u0430\u0441 \u2265 50\n      ELSE 'chronic'  -- \u0438 \u0440\u0430\u043d\u044c\u0448\u0435 \u0431\u044b\u043b \u043f\u043b\u043e\u0445\u0438\u043c\n    END as status\n  FROM recent_7d r\n  LEFT JOIN LATERAL (\n    SELECT pid, total_prior, cancel_rate_prior\n    FROM (SELECT *, prior_cancel_rate as cancel_rate_prior FROM prior_30d) pp\n    WHERE pp.pid = r.pid\n  ) p ON true\n  WHERE r.is_active = true\n  ORDER BY \n    CASE \n      WHEN p.pid IS NULL THEN 1\n      WHEN p.cancel_rate_prior < 50 THEN 2\n      ELSE 3\n    END,\n    r.total_7d DESC,\n    r.cancelled_7d DESC\n  LIMIT 40\n) t"
+      }
+    },
+    {
+      "id": "fmt",
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const input = $input.first().json || {};\nlet rows = input.result || [];\nif (typeof rows === 'string') { try { rows = JSON.parse(rows); } catch(e) { rows = []; } }\nif (!Array.isArray(rows)) rows = [];\n\nconst esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\n\nconst newProblems = rows.filter(r => r.status === 'new_problem');\nconst newlyCrossed = rows.filter(r => r.status === 'newly_crossed_50');\nconst chronic = rows.filter(r => r.status === 'chronic');\n\nif (rows.length === 0) {\n  return [{json: {skip: true, text: null, count: 0}}];\n}\n\nfunction lineOf(r, showPrior) {\n  const priorStr = showPrior && r.total_prior > 0 ? ' (\\u0431\\u044b\\u043b\\u043e ' + r.cancel_rate_prior + '%)' : '';\n  return '\\u2022 <b>' + esc(r.sku) + '</b> \\u2014 ' + r.cancel_rate_7d + '% (' + r.cancelled_7d + '/' + r.total_7d + ')' + priorStr + '\\n  <i>' + esc((r.name||'').slice(0,75)) + '</i>\\n  ' + esc((r.brand||'-').slice(0,20));\n}\n\nconst parts = [];\n\nif (newlyCrossed.length > 0) {\n  parts.push('\\ud83d\\udd34 <b>\\u041d\\u043e\\u0432\\u044b\\u0435 \\u043f\\u0440\\u043e\\u0431\\u043b\\u0435\\u043c\\u044b</b> (\\u0432\\u043f\\u0435\\u0440\\u0432\\u044b\\u0435 \\u043f\\u0435\\u0440\\u0435\\u0441\\u0435\\u043a\\u043b\\u0438 50%):\\n\\n' + newlyCrossed.slice(0,10).map(r => lineOf(r, true)).join('\\n\\n'));\n}\n\nif (newProblems.length > 0) {\n  parts.push('\\u26a0\\ufe0f <b>\\u041d\\u043e\\u0432\\u044b\\u0435 SKU \\u0441\\u0440\\u0430\\u0437\\u0443 \\u0441 \\u043f\\u0440\\u043e\\u0431\\u043b\\u0435\\u043c\\u043e\\u0439</b> (\\u043d\\u0435\\u0442 \\u0438\\u0441\\u0442\\u043e\\u0440\\u0438\\u0438 30+ \\u0434\\u043d\\u0435\\u0439):\\n\\n' + newProblems.slice(0,10).map(r => lineOf(r, false)).join('\\n\\n'));\n}\n\nif (chronic.length > 0) {\n  parts.push('\\ud83d\\udd38 <b>\\u0425\\u0440\\u043e\\u043d\\u0438\\u0447\\u0435\\u0441\\u043a\\u0438\\u0435</b> (\\u0431\\u044b\\u043b\\u0438 \\u043f\\u043b\\u043e\\u0445\\u0438\\u043c\\u0438 \\u0438 \\u043e\\u0441\\u0442\\u0430\\u044e\\u0442\\u0441\\u044f): ' + chronic.length + ' SKU \\u2014 \\u0441\\u043c. \\u043e\\u0442\\u0434\\u0435\\u043b\\u044c\\u043d\\u044b\\u0439 \\u0430\\u043b\\u0435\\u0440\\u0442 WF-R-ALERT-01.');\n}\n\n// SQL \\u0434\\u043b\\u044f \\u043c\\u0430\\u0441\\u0441\\u043e\\u0432\\u043e\\u0439 \\u0434\\u0435\\u0430\\u043a\\u0442\\u0438\\u0432\\u0430\\u0446\\u0438\\u0438 \\u043d\\u043e\\u0432\\u044b\\u0445 \\u043f\\u0440\\u043e\\u0431\\u043b\\u0435\\u043c\\u043d\\u044b\\u0445\nconst toDeactivate = [...newProblems, ...newlyCrossed].filter(r => r.cancel_rate_7d >= 80);\nif (toDeactivate.length > 0) {\n  const tickers = toDeactivate.map(r => \"'\" + String(r.sku).replace(/'/g,\"''\") + \"'\").join(', ');\n  parts.push('\\n\\n<b>\\ud83d\\udd27 SQL \\u0434\\u043b\\u044f \\u043c\\u0430\\u0441\\u0441\\u043e\\u0432\\u043e\\u0439 \\u0434\\u0435\\u0430\\u043a\\u0442\\u0438\\u0432\\u0430\\u0446\\u0438\\u0438 (cancel\\u226580%):</b>\\n<code>UPDATE products SET is_active = false WHERE ticker IN (' + tickers + ') OR slug IN (' + tickers + ');</code>');\n}\n\nconst today = new Date().toISOString().slice(0,10);\nconst header = '\\ud83d\\udee1\\ufe0f <b>Safety Check \\u2014 New Problem SKUs</b>\\n<i>' + today + ' | \\u0441\\u0440\\u0430\\u0432\\u043d\\u0435\\u043d\\u0438\\u0435 7\\u0434 \\u0441 \\u043f\\u0440\\u0435\\u0434\\u044b\\u0434\\u0443\\u0449\\u0438\\u043c\\u0438 30\\u0434</i>\\n\\n<b>' + rows.length + '</b> \\u043f\\u0440\\u043e\\u0431\\u043b\\u0435\\u043c\\u043d\\u044b\\u0445 \\u0430\\u043a\\u0442\\u0438\\u0432\\u043d\\u044b\\u0445 SKU | \\u043d\\u043e\\u0432\\u044b\\u0445: ' + (newProblems.length + newlyCrossed.length);\n\nconst text = header + '\\n\\n' + parts.join('\\n\\n');\n\nreturn [{json: {text, count: rows.length, new_count: newProblems.length + newlyCrossed.length, rows}}];"
+      }
+    },
+    {
+      "id": "if",
+      "name": "If Has Rows",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "tg",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "chatId": "83436260",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Thursday 10:00 MSK": {
+      "main": [
+        [
+          {
+            "node": "PG: Safety Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "PG: Safety Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG: Safety Check": {
+      "main": [
+        [
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format": {
+      "main": [
+        [
+          {
+            "node": "If Has Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Has Rows": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
