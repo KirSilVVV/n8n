@@ -1,0 +1,228 @@
+{
+  "name": "WF-R-WINBACK-01 Weekly At Risk Scan",
+  "nodes": [
+    {
+      "id": "sched",
+      "name": "Tuesday 09:30 MSK",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 6 * * 2"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wh",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "wf-r-winback-01-run",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf-r-winback-01-run",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "pg",
+      "name": "PG: Winback Candidates",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "mBKMS6IXC9Jf5DwC",
+          "name": "GG Production n8n_reader (5433 disable SSL)"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(json_agg(t), '[]'::json) as result FROM (\n  WITH b AS (\n    SELECT o.user_id,\n      COUNT(*) as orders,\n      SUM(o.total_amount)/100.0 as ltv,\n      (NOW()::date - MAX(o.created_at)::date) as silent,\n      MAX(o.created_at)::date as last_dt\n    FROM orders o\n    WHERE o.status='completed' AND o.user_id IS NOT NULL \n      AND o.channel='web' AND o.total_amount > 0\n    GROUP BY o.user_id\n  ),\n  fav_brand AS (\n    SELECT o.user_id, p.brand,\n      ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY COUNT(*) DESC) as rn\n    FROM order_items oi\n    JOIN orders o ON o.id=oi.order_id\n    JOIN products p ON p.id=oi.product_id\n    WHERE o.status='completed' AND o.channel='web' AND p.brand IS NOT NULL\n    GROUP BY o.user_id, p.brand\n  ),\n  fav_sku AS (\n    SELECT o.user_id, COALESCE(p.ticker, p.slug) as sku, p.name,\n      ROW_NUMBER() OVER (PARTITION BY o.user_id ORDER BY COUNT(*) DESC) as rn\n    FROM order_items oi\n    JOIN orders o ON o.id=oi.order_id\n    JOIN products p ON p.id=oi.product_id\n    WHERE o.status='completed' AND o.channel='web'\n    GROUP BY o.user_id, p.ticker, p.slug, p.name\n  )\n  SELECT \n    b.user_id::text as uid,\n    u.email, u.phone, u.telegram_id::text as tg_id,\n    u.display_name, u.language,\n    b.orders, ROUND(b.ltv::numeric) as ltv_eur,\n    b.silent as days_silent, b.last_dt,\n    fb.brand as fav_brand,\n    fs.sku as fav_sku, fs.name as fav_name\n  FROM b\n  JOIN users u ON u.id = b.user_id\n  LEFT JOIN fav_brand fb ON fb.user_id = b.user_id AND fb.rn = 1\n  LEFT JOIN fav_sku fs ON fs.user_id = b.user_id AND fs.rn = 1\n  WHERE b.ltv >= 200\n    AND b.silent BETWEEN 30 AND 60\n    AND b.orders >= 3\n    AND u.is_banned = false\n  ORDER BY b.ltv DESC\n  LIMIT 50\n) t"
+      }
+    },
+    {
+      "id": "fmt",
+      "name": "Format + CSV",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const input = $input.first().json || {};\nlet rows = input.result || [];\nif (typeof rows === 'string') { try { rows = JSON.parse(rows); } catch(e) { rows = []; } }\nif (!Array.isArray(rows)) rows = [];\n\nconst esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');\n\n// \\u0413\\u0435\\u043d\\u0435\\u0440\\u0430\\u0442\\u043e\\u0440 \\u043f\\u0435\\u0440\\u0441\\u043e\\u043d\\u0430\\u043b\\u044c\\u043d\\u044b\\u0445 \\u043f\\u0440\\u043e\\u043c\\u043e\\u043a\\u043e\\u0434\\u043e\\u0432\nfunction genCode(email) {\n  const base = String(email || 'USER').replace(/[^a-zA-Z0-9]/g,'').toUpperCase().slice(0,4).padEnd(4,'X');\n  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';\n  let rand = '';\n  for (let i=0; i<4; i++) rand += chars[Math.floor(Math.random()*chars.length)];\n  return 'WB' + base + rand;\n}\n\n// \\u0414\\u043e\\u0431\\u0430\\u0432\\u043b\\u044f\\u0435\\u043c \\u043f\\u0440\\u043e\\u043c\\u043e\\u043a\\u043e\\u0434\\u044b \\u0438 \\u043a\\u0430\\u043d\\u0430\\u043b\nrows = rows.map(r => {\n  let channel;\n  if (r.tg_id) channel = 'telegram';\n  else if (r.phone) channel = 'sms';\n  else channel = 'email';\n  return { ...r, promocode: genCode(r.email), suggested_channel: channel };\n});\n\nif (rows.length === 0) {\n  return [{json: { skip: true, count: 0, text: null, csv: null, rows: [] }}];\n}\n\n// CSV\nconst headers = ['rank','priority','email','phone','telegram_id','language','orders','ltv_eur','days_silent','last_order_date','fav_brand','fav_sku','fav_product_name','suggested_channel','promocode'];\nconst escCsv = v => { const s = String(v == null ? '' : v); return '\"' + s.replace(/\"/g,'\"\"') + '\"'; };\nconst csvLines = [headers.map(escCsv).join(',')];\nrows.forEach((r, i) => {\n  const priority = r.ltv_eur >= 1000 ? 'HIGH' : r.ltv_eur >= 500 ? 'MID' : 'LOW';\n  csvLines.push([\n    i+1, priority,\n    r.email||'', r.phone||'', r.tg_id||'', r.language||'ru',\n    r.orders, r.ltv_eur, r.days_silent, r.last_dt,\n    r.fav_brand||'', r.fav_sku||'', (r.fav_name||'').slice(0,60),\n    r.suggested_channel, r.promocode\n  ].map(escCsv).join(','));\n});\nconst csv = csvLines.join('\\n');\n\n// Telegram summary (top-10)\nconst totalLtv = rows.reduce((s,r) => s + Number(r.ltv_eur||0), 0);\nconst high = rows.filter(r => r.ltv_eur >= 1000).length;\nconst mid = rows.filter(r => r.ltv_eur >= 500 && r.ltv_eur < 1000).length;\nconst low = rows.length - high - mid;\n\nconst topLines = rows.slice(0, 10).map((r, i) => {\n  const ch = r.suggested_channel === 'telegram' ? '\\ud83d\\udce9' : r.suggested_channel === 'sms' ? '\\u260e\\ufe0f' : '\\u2709\\ufe0f';\n  return (i+1) + '. ' + ch + ' <code>' + esc(r.email || '(no email)') + '</code> \\u2014 <b>\\u20ac' + r.ltv_eur + '</b>, ' + r.orders + ' \\u0437\\u0430\\u043a., ' + r.days_silent + '\\u0434 \\u0442\\u0438\\u0448\\u0438\\u043d\\u044b \\u2192 <code>' + r.promocode + '</code>';\n}).join('\\n');\n\nconst today = new Date().toISOString().slice(0,10);\nconst text = '\\ud83d\\udce8 <b>Winback Weekly \\u2014 \\u043d\\u043e\\u0432\\u044b\\u0435 At Risk Champions</b>\\n<i>' + today + ' | \\u043f\\u043e\\u0440\\u043e\\u0433: LTV\\u2265\\u20ac200, \\u0442\\u0438\\u0448\\u0438\\u043d\\u0430 30-60\\u0434, \\u22653 \\u0437\\u0430\\u043a\\u0430\\u0437\\u0430</i>\\n\\n<b>' + rows.length + '</b> \\u043a\\u0430\\u043d\\u0434\\u0438\\u0434\\u0430\\u0442\\u043e\\u0432, \\u0441\\u0443\\u043c\\u043c\\u0430\\u0440\\u043d\\u044b\\u0439 LTV <b>\\u20ac' + totalLtv + '</b>\\n\\u2022 HIGH (\\u20ac1000+): ' + high + '\\n\\u2022 MID (\\u20ac500\\u2013999): ' + mid + '\\n\\u2022 LOW (\\u20ac200\\u2013499): ' + low + '\\n\\n<b>\\u0422\\u043e\\u043f-10:</b>\\n' + topLines + '\\n\\n\\u2192 \\u041c\\u0430\\u043a\\u0441\\u0438\\u043c: \\u043f\\u043e\\u043b\\u043d\\u044b\\u0439 CSV \\u2014 \\u0441\\u043b\\u0435\\u0434\\u0443\\u044e\\u0449\\u0438\\u043c \\u0444\\u0430\\u0439\\u043b\\u043e\\u043c.';\n\n// \\u0418\\u043c\\u044f \\u0444\\u0430\\u0439\\u043b\\u0430\nconst filename = 'winback_' + today.replace(/-/g,'') + '.csv';\n\nreturn [{\n  json: { text, count: rows.length, total_ltv: totalLtv, rows, filename },\n  binary: { data: { data: Buffer.from(csv, 'utf-8').toString('base64'), mimeType: 'text/csv', fileName: filename } }\n}];"
+      }
+    },
+    {
+      "id": "if",
+      "name": "If Has Rows",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      }
+    },
+    {
+      "id": "tg_txt",
+      "name": "Telegram: Summary",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1100,
+        -50
+      ],
+      "parameters": {
+        "chatId": "83436260",
+        "text": "={{ $('Format + CSV').item.json.text }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    },
+    {
+      "id": "tg_doc",
+      "name": "Telegram: CSV",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        -50
+      ],
+      "parameters": {
+        "resource": "message",
+        "operation": "sendDocument",
+        "chatId": "83436260",
+        "binaryData": true,
+        "binaryPropertyName": "data",
+        "additionalFields": {
+          "caption": "={{ 'Winback candidates: ' + $json.count + ' \\u0447\\u0435\\u043b\\u043e\\u0432\\u0435\\u043a \\u043d\\u0430 \\u20ac' + $json.total_ltv + ' LTV' }}"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Tuesday 09:30 MSK": {
+      "main": [
+        [
+          {
+            "node": "PG: Winback Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "PG: Winback Candidates",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG: Winback Candidates": {
+      "main": [
+        [
+          {
+            "node": "Format + CSV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format + CSV": {
+      "main": [
+        [
+          {
+            "node": "If Has Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Has Rows": {
+      "main": [
+        [
+          {
+            "node": "Telegram: CSV",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Telegram: CSV": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
