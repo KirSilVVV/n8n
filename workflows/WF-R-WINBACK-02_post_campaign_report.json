@@ -1,0 +1,179 @@
+{
+  "name": "WF-R-WINBACK-02 Post-Campaign Report",
+  "nodes": [
+    {
+      "id": "sched",
+      "name": "Weekly Monday 10:00 MSK",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 7 * * 1"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "wh",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "wf-r-winback-02-run",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf-r-winback-02-run",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "pg1",
+      "name": "PG: Redemption Totals",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        220,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "mBKMS6IXC9Jf5DwC",
+          "name": "GG Production n8n_reader (5433 disable SSL)"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(json_agg(t), '[]'::json) as result FROM (\n  WITH wb_codes AS (\n    SELECT p.id, p.code, p.used_count, p.max_uses, p.discount_value, p.created_at,\n           p.valid_until\n    FROM promocodes p\n    WHERE p.code LIKE 'WB%'\n      AND p.created_at >= NOW() - INTERVAL '30 days'\n  ),\n  usages AS (\n    SELECT pu.promocode_id,\n           COUNT(DISTINCT pu.user_id) as unique_redeemers,\n           COUNT(*) as uses,\n           SUM(pu.discount_amount)/100.0 as discount_given_eur,\n           MIN(pu.created_at)::date as first_redemption\n    FROM promocode_usages pu\n    WHERE pu.promocode_id IN (SELECT id FROM wb_codes)\n    GROUP BY pu.promocode_id\n  ),\n  redemption_orders AS (\n    SELECT pu.user_id, o.id as order_id, o.total_amount, o.created_at,\n           pu.promocode_id\n    FROM promocode_usages pu\n    JOIN orders o ON o.id = pu.order_id\n    WHERE o.status='completed' AND o.channel='web'\n      AND pu.promocode_id IN (SELECT id FROM wb_codes)\n  )\n  SELECT \n    'totals' as section,\n    json_build_object(\n      'codes_created', (SELECT COUNT(*) FROM wb_codes),\n      'codes_redeemed', (SELECT COUNT(DISTINCT promocode_id) FROM usages),\n      'unique_redeemers', (SELECT COUNT(DISTINCT user_id) FROM redemption_orders),\n      'redemption_orders', (SELECT COUNT(*) FROM redemption_orders),\n      'discount_given_eur', COALESCE((SELECT SUM(discount_given_eur) FROM usages)::int, 0),\n      'redemption_gmv_eur', COALESCE((SELECT ROUND(SUM(total_amount)/100.0)::int FROM redemption_orders), 0),\n      'conversion_pct', CASE WHEN (SELECT COUNT(*) FROM wb_codes) = 0 THEN 0\n                             ELSE ROUND(100.0 * (SELECT COUNT(DISTINCT promocode_id) FROM usages) \n                                   / NULLIF((SELECT COUNT(*) FROM wb_codes),0), 1) END\n    ) as data\n) t"
+      }
+    },
+    {
+      "id": "pg2",
+      "name": "PG: Return Rate",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "mBKMS6IXC9Jf5DwC",
+          "name": "GG Production n8n_reader (5433 disable SSL)"
+        }
+      },
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT COALESCE(json_agg(t), '[]'::json) as result FROM (\n  -- \u041a\u0442\u043e \u0432\u0435\u0440\u043d\u0443\u043b\u0441\u044f \u043f\u043e\u0441\u043b\u0435 \u0432\u044b\u0434\u0430\u0447\u0438 \u043f\u0440\u043e\u043c\u043e\u043a\u043e\u0434\u0430 (\u0432 \u0442\u043e\u043c \u0447\u0438\u0441\u043b\u0435 \u0431\u0435\u0437 \u043d\u0435\u0433\u043e)\n  -- \u0422\u043e\u043b\u044c\u043a\u043e \u0434\u043b\u044f \u044e\u0437\u0435\u0440\u043e\u0432, \u043a\u043e\u0442\u043e\u0440\u044b\u043c \u0432\u044b\u0434\u0430\u043d \u043f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 WB* \u0437\u0430 \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 30 \u0434\u043d\u0435\u0439\n  WITH wb_users AS (\n    SELECT DISTINCT pu.user_id, MIN(p.created_at) as code_issued_at\n    FROM promocodes p\n    JOIN promocode_usages pu ON pu.promocode_id = p.id\n    WHERE p.code LIKE 'WB%' AND p.created_at >= NOW() - INTERVAL '30 days'\n    GROUP BY pu.user_id\n  ),\n  returns AS (\n    SELECT \n      wu.user_id,\n      COUNT(*) FILTER (WHERE o.created_at >= wu.code_issued_at) as orders_after,\n      SUM(o.total_amount) FILTER (WHERE o.created_at >= wu.code_issued_at)/100.0 as gmv_after\n    FROM wb_users wu\n    LEFT JOIN orders o ON o.user_id = wu.user_id \n      AND o.status='completed' AND o.channel='web' AND o.total_amount > 0\n    GROUP BY wu.user_id\n  )\n  SELECT \n    COUNT(*) as users_with_promo,\n    COUNT(*) FILTER (WHERE orders_after > 0) as users_returned,\n    COALESCE(ROUND(SUM(gmv_after)::numeric), 0) as total_gmv_after\n  FROM returns\n) t"
+      }
+    },
+    {
+      "id": "fmt",
+      "name": "Format",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const t1 = $('PG: Redemption Totals').item.json;\nconst t2 = $('PG: Return Rate').item.json;\n\nfunction parseRes(x) {\n  let r = x?.result;\n  if (typeof r === 'string') { try { r = JSON.parse(r); } catch(e) { r = []; } }\n  return Array.isArray(r) ? r : [];\n}\n\nconst totalsArr = parseRes(t1);\nconst returnsArr = parseRes(t2);\nconst totals = totalsArr[0]?.data || {};\nconst returns = returnsArr[0] || {};\n\nconst d = new Date().toISOString().slice(0,10);\n\nif ((totals.codes_created || 0) === 0) {\n  const text = '\\ud83d\\udcc8 <b>Winback Post-Campaign Report</b>\\n<i>' + d + '</i>\\n\\n\\u0417\\u0430 \\u043f\\u043e\\u0441\\u043b\\u0435\\u0434\\u043d\\u0438\\u0435 30 \\u0434\\u043d\\u0435\\u0439 \\u043d\\u0435 \\u0441\\u043e\\u0437\\u0434\\u0430\\u043d\\u043e \\u043d\\u0438 \\u043e\\u0434\\u043d\\u043e\\u0433\\u043e \\u043f\\u0440\\u043e\\u043c\\u043e\\u043a\\u043e\\u0434\\u0430 \\u0441 \\u043f\\u0440\\u0435\\u0444\\u0438\\u043a\\u0441\\u043e\\u043c WB \\u2014 \\u043d\\u0435\\u0447\\u0435\\u0433\\u043e \\u0430\\u043d\\u0430\\u043b\\u0438\\u0437\\u0438\\u0440\\u043e\\u0432\\u0430\\u0442\\u044c.';\n  return [{json: {text, skip_if_empty: true}}];\n}\n\nconst created = totals.codes_created || 0;\nconst redeemed = totals.codes_redeemed || 0;\nconst conv = totals.conversion_pct || 0;\nconst users = totals.unique_redeemers || 0;\nconst discountGiven = totals.discount_given_eur || 0;\nconst redemptionGmv = totals.redemption_gmv_eur || 0;\n\nconst usersWithPromo = returns.users_with_promo || 0;\nconst usersReturned = returns.users_returned || 0;\nconst gmvAfter = returns.total_gmv_after || 0;\nconst returnRate = usersWithPromo > 0 ? Math.round(100 * usersReturned / usersWithPromo) : 0;\n\nconst roi = discountGiven > 0 ? (gmvAfter / discountGiven).toFixed(1) : 'N/A';\n\nconst text = '\\ud83d\\udcc8 <b>Winback Post-Campaign Report</b>\\n<i>' + d + ' | \\u043e\\u043a\\u043d\\u043e: 30 \\u0434\\u043d\\u0435\\u0439</i>\\n\\n' +\n  '<b>\\u041f\\u0440\\u043e\\u043c\\u043e\\u043a\\u043e\\u0434\\u044b (WB*):</b>\\n' +\n  '\\u2022 \\u0421\\u043e\\u0437\\u0434\\u0430\\u043d\\u043e: ' + created + '\\n' +\n  '\\u2022 \\u0410\\u043a\\u0442\\u0438\\u0432\\u0438\\u0440\\u043e\\u0432\\u0430\\u043d\\u043e: ' + redeemed + ' (' + conv + '%)\\n' +\n  '\\u2022 \\u0423\\u043d\\u0438\\u043a\\u0430\\u043b\\u044c\\u043d\\u044b\\u0445 \\u044e\\u0437\\u0435\\u0440\\u043e\\u0432: ' + users + '\\n' +\n  '\\u2022 \\u0412\\u044b\\u0434\\u0430\\u043d\\u043e \\u0441\\u043a\\u0438\\u0434\\u043a\\u0438: \\u20ac' + discountGiven + '\\n' +\n  '\\u2022 GMV \\u043f\\u043e \\u043f\\u0440\\u043e\\u043c\\u043e\\u043a\\u043e\\u0434\\u0443: \\u20ac' + redemptionGmv + '\\n\\n' +\n  '<b>\\u0412\\u043e\\u0437\\u0432\\u0440\\u0430\\u0442 \\u0432 \\u0440\\u0438\\u0442\\u043c:</b>\\n' +\n  '\\u2022 \\u0412\\u0435\\u0440\\u043d\\u0443\\u043b\\u043e\\u0441\\u044c: ' + usersReturned + ' \\u0438\\u0437 ' + usersWithPromo + ' (' + returnRate + '%)\\n' +\n  '\\u2022 GMV \\u043f\\u043e\\u0441\\u043b\\u0435 \\u0432\\u044b\\u0434\\u0430\\u0447\\u0438 \\u043f\\u0440\\u043e\\u043c\\u043e\\u043a\\u043e\\u0434\\u0430: \\u20ac' + gmvAfter + '\\n' +\n  '\\u2022 ROI (GMV/\\u0441\\u043a\\u0438\\u0434\\u043a\\u0430): \\u00d7' + roi + '\\n\\n' +\n  (returnRate >= 30 ? '\\u2705 \\u041a\\u0430\\u043c\\u043f\\u0430\\u043d\\u0438\\u044f \\u0440\\u0430\\u0431\\u043e\\u0442\\u0430\\u0435\\u0442 \\u2014 \\u043f\\u0440\\u043e\\u0434\\u043e\\u043b\\u0436\\u0430\\u0442\\u044c.' : '\\u26a0\\ufe0f \\u041e\\u0442\\u043a\\u043b\\u0438\\u043a \\u043d\\u0438\\u0437\\u043a\\u0438\\u0439 \\u2014 \\u0440\\u0430\\u0437\\u043e\\u0431\\u0440\\u0430\\u0442\\u044c\\u0441\\u044f \\u0441 \\u043a\\u0430\\u043d\\u0430\\u043b\\u043e\\u043c/\\u043e\\u0444\\u0444\\u0435\\u0440\\u043e\\u043c.');\n\nreturn [{json: {text}}];"
+      }
+    },
+    {
+      "id": "tg",
+      "name": "Telegram",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "chatId": "83436260",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Weekly Monday 10:00 MSK": {
+      "main": [
+        [
+          {
+            "node": "PG: Redemption Totals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "PG: Redemption Totals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG: Redemption Totals": {
+      "main": [
+        [
+          {
+            "node": "PG: Return Rate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG: Return Rate": {
+      "main": [
+        [
+          {
+            "node": "Format",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format": {
+      "main": [
+        [
+          {
+            "node": "Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
