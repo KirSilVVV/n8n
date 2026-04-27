@@ -1,0 +1,149 @@
+{
+  "name": "WF-WINBACK-EMAIL-SENDER",
+  "nodes": [
+    {
+      "id": "wh",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "send-winback-batch",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "send-winback-batch",
+        "responseMode": "lastNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "split",
+      "name": "Split Recipients",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\nconst recipients = body.recipients || [];\nconst from_email = body.from_email || 'business@gaming-goods.com';\nconst from_name = body.from_name || '\u041a\u0438\u0440\u0438\u043b\u043b, Gaming Goods';\nreturn recipients.map(r => ({json: {...r, from_email, from_name}}));"
+      }
+    },
+    {
+      "id": "send",
+      "name": "Send Email (SMTP)",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        440,
+        0
+      ],
+      "credentials": {
+        "smtp": {
+          "id": "PLACEHOLDER_SMTP_CRED",
+          "name": "GG Marketing SMTP (TODO \u0421\u0430\u0448\u0430)"
+        }
+      },
+      "parameters": {
+        "fromEmail": "={{ $json.from_email }}",
+        "fromName": "={{ $json.from_name }}",
+        "toEmail": "={{ $json.to }}",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "both",
+        "text": "={{ $json.body_text }}",
+        "html": "={{ $json.body_html }}",
+        "options": {
+          "replyTo": "={{ $json.reply_to || $json.from_email }}"
+        }
+      },
+      "continueOnFail": true
+    },
+    {
+      "id": "agg",
+      "name": "Aggregate Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "parameters": {
+        "jsCode": "const items = $input.all();\nlet sent = 0, failed = 0;\nconst errors = [];\nfor (const it of items) {\n  const r = it.json || {};\n  if (r.error) {\n    failed++;\n    errors.push((r.to||'?') + ': ' + String(r.error).slice(0,80));\n  } else if (r.accepted || r.messageId || r.response) {\n    sent++;\n  } else { failed++; }\n}\nconst today = new Date().toISOString().slice(0,10);\nlet text = '\\u2709\\ufe0f <b>Winback Email \\u2014 \\u0440\\u0435\\u0437\\u0443\\u043b\\u044c\\u0442\\u0430\\u0442</b> ' + today + '\\n\\n';\ntext += '\\u2705 \\u041e\\u0442\\u043f\\u0440\\u0430\\u0432\\u043b\\u0435\\u043d\\u043e: ' + sent + '\\n';\ntext += '\\u274c \\u041e\\u0448\\u0438\\u0431\\u043e\\u043a: ' + failed;\nif (errors.length > 0) {\n  text += '\\n\\n<b>\\u041e\\u0448\\u0438\\u0431\\u043a\\u0438 (\\u043f\\u0435\\u0440\\u0432\\u044b\\u0435 5):</b>\\n' + errors.slice(0,5).map(e => '\\u2022 ' + e).join('\\n');\n}\nreturn [{json: {text, sent, failed}}];"
+      }
+    },
+    {
+      "id": "tg",
+      "name": "Telegram Report",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        880,
+        0
+      ],
+      "parameters": {
+        "chatId": "83436260",
+        "text": "={{ $json.text }}",
+        "additionalFields": {
+          "parse_mode": "HTML"
+        }
+      },
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Split Recipients",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Recipients": {
+      "main": [
+        [
+          {
+            "node": "Send Email (SMTP)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Email (SMTP)": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Results": {
+      "main": [
+        [
+          {
+            "node": "Telegram Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
