@@ -45,9 +45,9 @@
 | # | Продукт | UUID | Brand | Slug page | Обоснование |
 |--:|---------|------|-------|-----------|-------------|
 | 7 | **iTunes $10 CA Card** | `28f13da4-e3d4-5b4d-9fdf-dbe0cfde886b` | iTunes | `/t/itunes-gift-card` | Whale kurenev, топ-продаваемая Apple |
-| 8 | **Apple ¥1000 Gift Card JP** | `3aac8769-8039-461e-b10f-f61879bc4efa` | Apple Gift Cards | `/t/apple-gift-cards-gift-card` | Низкий порог входа в Apple-нишу |
+| 8 | **Apple $10 Gift Card US** | `711e8387-92aa-5de0-85d0-e71e08ba1050` | Apple Gift Cards | `/t/apple-gift-cards-gift-card` | USD/US — самый востребованный регион для российских Apple ID |
 | 9 | **ChatGPT Plus 1-Month** | `e38e84c8-df66-4fe5-a9b4-e72bd3c3f53f` | ChatGPT Plus | `/t/chatgpt-plus-subscription` | Уже есть, оставляем |
-| 10 | **Roblox eCard £10** | `7a918901-9b41-5101-a78c-337c8c6c3151` | Roblox | `/t/roblox-currency` | 48 продаж — реальный топ! |
+| 10 | **Roblox 1000 Robux** (Global) | `9509964f-4497-5e01-9779-f35933aaacd3` | Roblox | `/t/roblox-currency` | 16 продаж за 30 дней, без региональной привязки |
 | 11 | **PlayStation Plus Premium 1mo** | `5d7a807a-62e3-5fec-9137-296cec52996a` | PlayStation Plus | `/t/playstation-plus-subscription` | Стратегический бренд |
 | 12 | **Discord Nitro 1-Month** | `9249de2c-bcbb-5aa4-bd51-13994a3b419c` | Discord | `/t/discord-subscription` | 11 продаж + gaming community |
 
@@ -151,7 +151,6 @@
 ## ❓ Открытые вопросы (если нужны)
 
 - Как править Хиты — через БД-таблицу, конфиг или admin UI? Если есть admin — могу подсказать какие UUID куда вставить.
-- Apple Gift Card JP в позиции 8 — нормально что японская? Это самый низкий порог входа в нишу (0.07 EUR), для теста ниши хорошо. Можно заменить на USA/EU вариант если предпочитаешь.
 
 ---
 
