@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T14:33:01.563Z",
+  "createdAt": "2026-03-01T14:33:01.563Z",
+  "id": "6sXDSgG0UO2mfzZS",
+  "name": "[R] rev-seg-final",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "rk-rev-final-001",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "rk-rev-final-001"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT\n  segment,\n  COUNT(*) as orders,\n  ROUND(SUM(total_eur), 2) as revenue_eur,\n  ROUND(SUM(total_eur) * rub_per_eur, 0) as revenue_rub,\n  ROUND(\n    SUM(total_eur) * rub_per_eur *\n    CASE segment WHEN 'Nutaku' THEN 0.40 ELSE 0.07 END,\n    0\n  ) as margin_rub,\n  rub_per_eur as rate\nFROM (\n  SELECT\n    (mo.content->>'total')::numeric / 100 as total_eur,\n    ROUND(1.0 / cx.exchange_rate, 2) as rub_per_eur,\n    CASE\n      WHEN mo.content->'items'->0->>'brand' = 'Nutaku' THEN 'Nutaku'\n      WHEN mo.order_data->>'source' = 'yandex_market' THEN 'YandexMarket'\n      ELSE 'SEO'\n    END as segment\n  FROM marketplace_order mo\n  CROSS JOIN (SELECT exchange_rate FROM currency WHERE code = 'RUB') cx\n  WHERE mo.status IN ('completed','completed_with_review')\n    AND mo.updated_at >= CURRENT_DATE - 1\n    AND mo.updated_at < CURRENT_DATE\n) sub\nGROUP BY segment, rub_per_eur\nORDER BY segment\n",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "Q",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Q",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "1f4e1372-b874-4d86-8ca9-d74ab94d9237",
+  "activeVersionId": "1f4e1372-b874-4d86-8ca9-d74ab94d9237",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:33:01.563Z",
+      "createdAt": "2026-03-01T14:33:01.563Z",
+      "role": "workflow:owner",
+      "workflowId": "6sXDSgG0UO2mfzZS",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T14:33:01.638Z",
+    "createdAt": "2026-03-01T14:33:01.638Z",
+    "versionId": "1f4e1372-b874-4d86-8ca9-d74ab94d9237",
+    "workflowId": "6sXDSgG0UO2mfzZS",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "rk-rev-final-001",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "wh1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "rk-rev-final-001"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "\nSELECT\n  segment,\n  COUNT(*) as orders,\n  ROUND(SUM(total_eur), 2) as revenue_eur,\n  ROUND(SUM(total_eur) * rub_per_eur, 0) as revenue_rub,\n  ROUND(\n    SUM(total_eur) * rub_per_eur *\n    CASE segment WHEN 'Nutaku' THEN 0.40 ELSE 0.07 END,\n    0\n  ) as margin_rub,\n  rub_per_eur as rate\nFROM (\n  SELECT\n    (mo.content->>'total')::numeric / 100 as total_eur,\n    ROUND(1.0 / cx.exchange_rate, 2) as rub_per_eur,\n    CASE\n      WHEN mo.content->'items'->0->>'brand' = 'Nutaku' THEN 'Nutaku'\n      WHEN mo.order_data->>'source' = 'yandex_market' THEN 'YandexMarket'\n      ELSE 'SEO'\n    END as segment\n  FROM marketplace_order mo\n  CROSS JOIN (SELECT exchange_rate FROM currency WHERE code = 'RUB') cx\n  WHERE mo.status IN ('completed','completed_with_review')\n    AND mo.updated_at >= CURRENT_DATE - 1\n    AND mo.updated_at < CURRENT_DATE\n) sub\nGROUP BY segment, rub_per_eur\nORDER BY segment\n",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "Q",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          480,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Q",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
