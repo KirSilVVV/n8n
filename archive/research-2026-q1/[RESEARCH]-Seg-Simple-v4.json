@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T14:36:50.303Z",
+  "createdAt": "2026-03-01T14:30:03.162Z",
+  "id": "ZaazPj34bQIwgPXB",
+  "name": "[RESEARCH] Seg Simple v4",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "research-seg-003",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "research-seg-003"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT json_build_object(\n  'columns', (\n    SELECT json_agg(column_name ORDER BY ordinal_position)\n    FROM information_schema.columns WHERE table_name='marketplace_order'\n  ),\n  'date_columns', (\n    SELECT json_agg(json_build_object('col',column_name,'type',data_type))\n    FROM information_schema.columns\n    WHERE table_name='marketplace_order'\n      AND data_type IN ('timestamp without time zone','timestamp with time zone','date')\n  ),\n  'currency', (\n    SELECT json_build_object('rate', exchange_rate, 'rub_per_eur', ROUND((1.0/exchange_rate)::numeric,2))\n    FROM currency WHERE code='RUB'\n  ),\n  'yesterday_sample', (\n    SELECT json_agg(row_to_json(t)) FROM (\n      SELECT id, status, external_order_id,\n        LEFT(content::text,200) as content_sample,\n        LEFT(order_data::text,200) as order_data_sample\n      FROM marketplace_order\n      WHERE status IN ('completed','completed_with_review')\n      ORDER BY id DESC LIMIT 3\n    ) t\n  )\n) as result\n",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "Nutaku Brands",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Nutaku Brands",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "3f22e9eb-7b3e-430a-88c7-fff231f2d2ec",
+  "activeVersionId": "3f22e9eb-7b3e-430a-88c7-fff231f2d2ec",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:30:03.162Z",
+      "createdAt": "2026-03-01T14:30:03.162Z",
+      "role": "workflow:owner",
+      "workflowId": "ZaazPj34bQIwgPXB",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T14:36:50.305Z",
+    "createdAt": "2026-03-01T14:36:50.305Z",
+    "versionId": "3f22e9eb-7b3e-430a-88c7-fff231f2d2ec",
+    "workflowId": "ZaazPj34bQIwgPXB",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "research-seg-003",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "wh1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "research-seg-003"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "\nSELECT json_build_object(\n  'columns', (\n    SELECT json_agg(column_name ORDER BY ordinal_position)\n    FROM information_schema.columns WHERE table_name='marketplace_order'\n  ),\n  'date_columns', (\n    SELECT json_agg(json_build_object('col',column_name,'type',data_type))\n    FROM information_schema.columns\n    WHERE table_name='marketplace_order'\n      AND data_type IN ('timestamp without time zone','timestamp with time zone','date')\n  ),\n  'currency', (\n    SELECT json_build_object('rate', exchange_rate, 'rub_per_eur', ROUND((1.0/exchange_rate)::numeric,2))\n    FROM currency WHERE code='RUB'\n  ),\n  'yesterday_sample', (\n    SELECT json_agg(row_to_json(t)) FROM (\n      SELECT id, status, external_order_id,\n        LEFT(content::text,200) as content_sample,\n        LEFT(order_data::text,200) as order_data_sample\n      FROM marketplace_order\n      WHERE status IN ('completed','completed_with_review')\n      ORDER BY id DESC LIMIT 3\n    ) t\n  )\n) as result\n",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "Nutaku Brands",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          480,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Nutaku Brands",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
