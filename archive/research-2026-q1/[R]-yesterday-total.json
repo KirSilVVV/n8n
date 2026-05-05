@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T14:32:24.570Z",
+  "createdAt": "2026-03-01T14:32:24.570Z",
+  "id": "S60aNmrEflqifQzw",
+  "name": "[R] yesterday-total",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "rk-yesterday-001",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "rk-yesterday-001"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT\n  COUNT(*) as total_orders,\n  ROUND(SUM((content->>'total')::numeric / 100), 2) as total_eur,\n  MIN(updated_at::date) as date_min,\n  MAX(updated_at::date) as date_max\nFROM marketplace_order\nWHERE status IN ('completed','completed_with_review')\n  AND updated_at >= CURRENT_DATE - 1\n  AND updated_at < CURRENT_DATE\n",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "Q",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Q",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "c20825a7-1675-4332-8630-98969fa9eda9",
+  "activeVersionId": "c20825a7-1675-4332-8630-98969fa9eda9",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:32:24.570Z",
+      "createdAt": "2026-03-01T14:32:24.570Z",
+      "role": "workflow:owner",
+      "workflowId": "S60aNmrEflqifQzw",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T14:32:24.583Z",
+    "createdAt": "2026-03-01T14:32:24.583Z",
+    "versionId": "c20825a7-1675-4332-8630-98969fa9eda9",
+    "workflowId": "S60aNmrEflqifQzw",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "rk-yesterday-001",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "wh1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "rk-yesterday-001"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "\nSELECT\n  COUNT(*) as total_orders,\n  ROUND(SUM((content->>'total')::numeric / 100), 2) as total_eur,\n  MIN(updated_at::date) as date_min,\n  MAX(updated_at::date) as date_max\nFROM marketplace_order\nWHERE status IN ('completed','completed_with_review')\n  AND updated_at >= CURRENT_DATE - 1\n  AND updated_at < CURRENT_DATE\n",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "Q",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          480,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Q",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
