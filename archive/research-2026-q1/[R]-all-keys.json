@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T14:32:04.053Z",
+  "createdAt": "2026-03-01T14:32:04.053Z",
+  "id": "EZPJPAgOhGlaqYGT",
+  "name": "[R] all-keys",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "rk-all-keys-001",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "rk-all-keys-001"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT key, COUNT(*) as cnt\nFROM marketplace_order, jsonb_object_keys(order_data) as key\nGROUP BY key ORDER BY cnt DESC LIMIT 30\n",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "Q",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Q",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "fd01a00e-1256-469c-91d6-324d56e46a79",
+  "activeVersionId": "fd01a00e-1256-469c-91d6-324d56e46a79",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:32:04.053Z",
+      "createdAt": "2026-03-01T14:32:04.053Z",
+      "role": "workflow:owner",
+      "workflowId": "EZPJPAgOhGlaqYGT",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T14:32:04.131Z",
+    "createdAt": "2026-03-01T14:32:04.131Z",
+    "versionId": "fd01a00e-1256-469c-91d6-324d56e46a79",
+    "workflowId": "EZPJPAgOhGlaqYGT",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "rk-all-keys-001",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "wh1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "rk-all-keys-001"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "\nSELECT key, COUNT(*) as cnt\nFROM marketplace_order, jsonb_object_keys(order_data) as key\nGROUP BY key ORDER BY cnt DESC LIMIT 30\n",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "Q",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          480,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Q",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
