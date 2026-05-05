@@ -1,0 +1,145 @@
+{
+  "updatedAt": "2026-03-01T14:31:24.915Z",
+  "createdAt": "2026-03-01T14:31:24.915Z",
+  "id": "580sHgSjxb23VAGf",
+  "name": "[R] Tables YM",
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "research-tables-ym",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "wh1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "research-tables-ym"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT table_name FROM information_schema.tables\nWHERE table_schema = 'public'\n  AND (LOWER(table_name) LIKE '%yandex%'\n    OR LOWER(table_name) LIKE '%market%'\n    OR LOWER(table_name) LIKE '%ym%'\n    OR LOWER(table_name) LIKE '%order%')\nORDER BY 1\n",
+        "options": {}
+      },
+      "id": "pg1",
+      "name": "Query",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        480,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "vMUuOggCtBWX48Jg",
+          "name": "Postgres account"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "staticData": null,
+  "meta": null,
+  "pinData": null,
+  "versionId": "1a7db9b4-e5b2-4378-9570-e58b67a56667",
+  "activeVersionId": "1a7db9b4-e5b2-4378-9570-e58b67a56667",
+  "triggerCount": 1,
+  "shared": [
+    {
+      "updatedAt": "2026-03-01T14:31:24.915Z",
+      "createdAt": "2026-03-01T14:31:24.915Z",
+      "role": "workflow:owner",
+      "workflowId": "580sHgSjxb23VAGf",
+      "projectId": "jCp1XTf5YwVTzsQI"
+    }
+  ],
+  "activeVersion": {
+    "updatedAt": "2026-03-01T14:31:24.930Z",
+    "createdAt": "2026-03-01T14:31:24.930Z",
+    "versionId": "1a7db9b4-e5b2-4378-9570-e58b67a56667",
+    "workflowId": "580sHgSjxb23VAGf",
+    "nodes": [
+      {
+        "parameters": {
+          "httpMethod": "GET",
+          "path": "research-tables-ym",
+          "responseMode": "lastNode",
+          "options": {}
+        },
+        "id": "wh1",
+        "name": "Webhook",
+        "type": "n8n-nodes-base.webhook",
+        "typeVersion": 2,
+        "position": [
+          240,
+          300
+        ],
+        "webhookId": "research-tables-ym"
+      },
+      {
+        "parameters": {
+          "operation": "executeQuery",
+          "query": "\nSELECT table_name FROM information_schema.tables\nWHERE table_schema = 'public'\n  AND (LOWER(table_name) LIKE '%yandex%'\n    OR LOWER(table_name) LIKE '%market%'\n    OR LOWER(table_name) LIKE '%ym%'\n    OR LOWER(table_name) LIKE '%order%')\nORDER BY 1\n",
+          "options": {}
+        },
+        "id": "pg1",
+        "name": "Query",
+        "type": "n8n-nodes-base.postgres",
+        "typeVersion": 2.5,
+        "position": [
+          480,
+          300
+        ],
+        "credentials": {
+          "postgres": {
+            "id": "vMUuOggCtBWX48Jg",
+            "name": "Postgres account"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Webhook": {
+        "main": [
+          [
+            {
+              "node": "Query",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "authors": "Kirill Silvestrov",
+    "name": null,
+    "description": null,
+    "autosaved": false
+  },
+  "tags": []
+}
