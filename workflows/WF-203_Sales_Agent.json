@@ -45,8 +45,7 @@
     {
       "parameters": {
         "url": "https://api.anthropic.com/v1/messages",
-        "authentication": "predefinedCredentialType",
-        "nodeCredentialType": "anthropicApi",
+        "authentication": "genericCredentialType",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -59,7 +58,8 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { model: 'claude-sonnet-4-5-20250929', max_tokens: 1500, system: $json.system_prompt, messages: [{role:'user', content: JSON.stringify($json.data)}] } }}",
-        "options": {}
+        "options": {},
+        "genericAuthType": "httpHeaderAuth"
       },
       "id": "a-203",
       "name": "Anthropic",
@@ -70,7 +70,7 @@
         300
       ],
       "credentials": {
-        "anthropicApi": {
+        "httpHeaderAuth": {
           "id": "xZPzwI0sOTN0iSp8",
           "name": "Anthropic API"
         }
