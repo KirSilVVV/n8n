@@ -72,7 +72,8 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ { model: 'claude-sonnet-4-5-20250929', max_tokens: 600, messages: [{role:'user', content: $json.prompt}] } }}",
-        "options": {}
+        "options": {},
+        "method": "POST"
       },
       "id": "anth-220",
       "name": "Anthropic · Draft msg",
@@ -108,7 +109,8 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ $json }}",
-        "options": {}
+        "options": {},
+        "method": "POST"
       },
       "id": "http-aq-220",
       "name": "POST · aq-add",
