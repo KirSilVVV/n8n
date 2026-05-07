@@ -1,16 +1,32 @@
 # SQL migrations
 
-Apply in order on the gg_new database (PG 65.108.141.27:5433).
+Apply in order on the gg_new database.
 
-| File | Purpose |
-|------|---------|
-| `001_ai_agent_memory.sql` | Conversation memory of AI agents (Director + sub-agents) |
-| `002_ai_action_queue.sql` | Queue of actions awaiting CEO approve / auto-approved by whitelist |
-| `003_ai_hourly_pulse.sql` | Heartbeat of each agent every hour with status + summary |
-| `004_ai_agent_settings.sql` | System prompts, model choice, whitelist actions per agent |
-| `005_ai_cost_log.sql` | Daily Anthropic API spend per agent for ROI tracking |
+**Connection:** `host=65.108.141.27 port=5433 dbname=gg_new user=ai_agent sslmode=disable`
 
-Apply with:
+| File | Creates | Purpose |
+|------|---------|---------|
+| `001_agent_memory.sql`   | `ai.agent_memory`   | Conversation memory (Director + sub-agents) |
+| `002_action_queue.sql`   | `ai.action_queue`   | Approval queue with SLA timer |
+| `003_hourly_pulse.sql`   | `ai.hourly_pulse`   | Per-agent heartbeat with status + metrics |
+| `004_agent_settings.sql` | `ai.agent_settings` | System prompts, model, budget per agent (+ 11 seed rows) |
+| `005_cost_log.sql`       | `ai.cost_log`       | Daily Anthropic API spend for ROI tracking |
+
+**Apply:**
 ```bash
-psql -h 65.108.141.27 -p 5433 -U n8n_writer -d gg_new -f sql/001_ai_agent_memory.sql
+psql "host=65.108.141.27 port=5433 dbname=gg_new user=ai_agent password=$DB_PASS sslmode=disable" \
+  -f sql/001_agent_memory.sql \
+  -f sql/002_action_queue.sql \
+  -f sql/003_hourly_pulse.sql \
+  -f sql/004_agent_settings.sql \
+  -f sql/005_cost_log.sql
 ```
+
+**Status:** ✅ all 5 applied to production on 7 May 2026.
+
+## Schema isolation
+
+All AI tables live in the `ai` schema, fully separated from `public`:
+- `ai_agent` user has full DDL/DML rights only inside `ai.*`
+- `ai_agent` has SELECT-only on `public.*` (orders, products, users, etc.)
+- Production data cannot be touched by AI workflows by design
