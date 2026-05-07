@@ -1,0 +1,183 @@
+{
+  "name": "WF-220 Whale Personal Touch",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 6 * * *"
+            }
+          ]
+        }
+      },
+      "id": "trigger-220",
+      "name": "Cron 09:30 МСК",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nWITH base AS (\n  SELECT\n    user_id,\n    COUNT(*) AS orders_90d,\n    SUM(total_amount)::numeric/100.0 AS gmv_eur_90d,\n    MAX(created_at) AS last_order,\n    EXTRACT(day FROM NOW() - MAX(created_at))::int AS silent_days,\n    AVG(EXTRACT(epoch FROM created_at - lag_t)/86400.0)::numeric(8,2) AS avg_interval_days,\n    AVG(total_amount)::numeric/100.0 AS avg_aov_eur\n  FROM (\n    SELECT user_id, created_at, total_amount,\n           LAG(created_at) OVER (PARTITION BY user_id ORDER BY created_at) AS lag_t\n    FROM public.orders\n    WHERE status IN ('completed','paid','fulfilled','delivered')\n      AND user_id IS NOT NULL\n      AND created_at >= NOW() - INTERVAL '90 days'\n  ) t\n  GROUP BY user_id\n  HAVING COUNT(*) >= 3 AND SUM(total_amount) >= 30000  -- ≥3 orders, ≥€300 in 90d\n),\ntop_brands AS (\n  SELECT DISTINCT ON (o.user_id)\n    o.user_id,\n    p.brand AS fav_brand\n  FROM public.orders o\n  JOIN public.order_items oi ON oi.order_id = o.id\n  JOIN public.products p ON p.id = oi.product_id\n  WHERE o.created_at >= NOW() - INTERVAL '90 days'\n  ORDER BY o.user_id, o.created_at DESC\n)\nSELECT json_agg(t) AS result FROM (\n  SELECT\n    b.user_id::text,\n    b.orders_90d,\n    b.gmv_eur_90d,\n    b.last_order::date::text AS last_order,\n    b.silent_days,\n    b.avg_interval_days,\n    b.avg_aov_eur,\n    tb.fav_brand,\n    -- anomaly flags\n    (b.silent_days > GREATEST(b.avg_interval_days * 1.5, 7)) AS is_silent_anomaly,\n    b.silent_days > 14 AS is_critical_silent\n  FROM base b\n  LEFT JOIN top_brands tb ON tb.user_id = b.user_id\n  ORDER BY b.gmv_eur_90d DESC\n  LIMIT 20\n) t;\n",
+        "options": {}
+      },
+      "id": "pg-top",
+      "name": "PG · Top whales 90d",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "LwmG3bwG5g2exyRt",
+          "name": "GG ai_agent (5433)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst all = $input.first().json.result || [];\nconst anomalies = all.filter(w => w.is_silent_anomaly);\nconst sliced = anomalies.slice(0, 5);  // cap at 5 per day to keep CEO sane\n\nreturn sliced.map(w => ({\n  json: {\n    whale: w,\n    prompt: `You are the personal-touch agent for Gaming Goods, a digital goods marketplace. Generate a SHORT message in Russian for the CEO Кирилл to send to a whale customer who has gone silent.\n\nCustomer profile:\n- User ID: ${w.user_id.slice(0,8)}...\n- Last order: ${w.last_order} (silent ${w.silent_days} days)\n- Average interval between orders: ${w.avg_interval_days} days (so silent is ${(w.silent_days/Math.max(w.avg_interval_days,1)).toFixed(1)}× normal)\n- 90-day GMV: €${w.gmv_eur_90d}\n- Orders in 90d: ${w.orders_90d}\n- Average ticket: €${w.avg_aov_eur}\n- Favorite brand: ${w.fav_brand || 'mixed'}\n\nWrite the message body ONLY (no greeting, no signature). Tone: warm, short, business. 3-4 sentences max. Offer something concrete (5% lifetime discount, or first-mover access to new arrivals, depending on profile). Speak as Кирилл, founder.\n\nReturn JSON object: {\"text\": \"...\", \"channel\": \"telegram|email\", \"offer_code\": \"TY-XXX-5\", \"why_now\": \"one-line reason\"}.`\n  }\n}));\n"
+      },
+      "id": "code-anom-220",
+      "name": "Find anomalies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: 'claude-sonnet-4-5-20250929', max_tokens: 600, messages: [{role:'user', content: $json.prompt}] } }}",
+        "options": {}
+      },
+      "id": "anth-220",
+      "name": "Anthropic · Draft msg",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "xZPzwI0sOTN0iSp8",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst resp = $input.first().json;\nconst whaleData = $('Find anomalies').item.json.whale;\nconst text = (resp.content && resp.content[0] && resp.content[0].text) || '';\nlet parsed;\ntry {\n  // try JSON-only response\n  parsed = JSON.parse(text);\n} catch(e) {\n  // fallback: extract text block\n  parsed = { text: text, channel: 'telegram', offer_code: 'TY-VIP-5', why_now: 'silent ' + whaleData.silent_days + ' days' };\n}\n\nreturn [{\n  json: {\n    agent_name: 'whale_personal',\n    action_type: 'whale_touch',\n    preview: 'Whale touch: ' + whaleData.user_id.slice(0,8) + '... · €' + whaleData.gmv_eur_90d + ' / 90d · silent ' + whaleData.silent_days + 'd',\n    payload: {\n      user_id: whaleData.user_id,\n      gmv_eur_90d: whaleData.gmv_eur_90d,\n      silent_days: whaleData.silent_days,\n      avg_interval: whaleData.avg_interval_days,\n      fav_brand: whaleData.fav_brand,\n      message: parsed.text,\n      channel: parsed.channel || 'telegram',\n      offer_code: parsed.offer_code || 'TY-VIP-5'\n    },\n    approval_required: true,\n    sla: '24 hours',\n    why_now: parsed.why_now || ('Silent ' + whaleData.silent_days + ' days vs ' + whaleData.avg_interval_days + ' avg')\n  }\n}];\n"
+      },
+      "id": "code-fmt-220",
+      "name": "Format card",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://n8n-4d54.onrender.com/webhook/aq-add",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "http-aq-220",
+      "name": "POST · aq-add",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1340,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Cron 09:30 МСК": {
+      "main": [
+        [
+          {
+            "node": "PG · Top whales 90d",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG · Top whales 90d": {
+      "main": [
+        [
+          {
+            "node": "Find anomalies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find anomalies": {
+      "main": [
+        [
+          {
+            "node": "Anthropic · Draft msg",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic · Draft msg": {
+      "main": [
+        [
+          {
+            "node": "Format card",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format card": {
+      "main": [
+        [
+          {
+            "node": "POST · aq-add",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
