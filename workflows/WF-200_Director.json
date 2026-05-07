@@ -1,0 +1,191 @@
+{
+  "name": "WF-200 Director Orchestrator",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6,9,12,15 * * *"
+            }
+          ]
+        }
+      },
+      "id": "t-200",
+      "name": "Cron 09/12/15/18 МСК",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT s.system_prompt, ai.fn_director_state() AS data FROM ai.agent_settings s WHERE s.agent_name = 'director';",
+        "options": {}
+      },
+      "id": "pg-200",
+      "name": "Get prompt+state",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        400,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "LwmG3bwG5g2exyRt",
+          "name": "GG ai_agent (5433)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: 'claude-sonnet-4-5-20250929', max_tokens: 1200, system: $json.system_prompt, messages: [{role:'user', content: JSON.stringify($json.data)}] } }}",
+        "options": {}
+      },
+      "id": "a-200",
+      "name": "Anthropic Sonnet",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        600,
+        300
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "xZPzwI0sOTN0iSp8",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const t = ($input.first().json.content||[])[0]; const text = (t && t.text) || 'No brief'; return [{ json: { text: text.slice(0, 800) } }];"
+      },
+      "id": "e-200",
+      "name": "Extract text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO ai.hourly_pulse (agent_name,pulse_at,status,summary) VALUES ('director',NOW(),'running',$1) RETURNING id;",
+        "options": {
+          "queryReplacement": "={{ ['Brief at ' + new Date().toISOString().slice(11,16) + ' sent to CEO'] }}"
+        }
+      },
+      "id": "p-200",
+      "name": "Pulse",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1000,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "LwmG3bwG5g2exyRt",
+          "name": "GG ai_agent (5433)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "83436260",
+        "text": "={{ $json.text }}",
+        "additionalFields": {}
+      },
+      "id": "t2-200",
+      "name": "TG · CEO Brief",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1000,
+        400
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron 09/12/15/18 МСК": {
+      "main": [
+        [
+          {
+            "node": "Get prompt+state",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get prompt+state": {
+      "main": [
+        [
+          {
+            "node": "Anthropic Sonnet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Sonnet": {
+      "main": [
+        [
+          {
+            "node": "Extract text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract text": {
+      "main": [
+        [
+          {
+            "node": "Pulse",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "TG · CEO Brief",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
