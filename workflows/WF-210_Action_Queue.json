@@ -1,0 +1,320 @@
+{
+  "name": "WF-210 Action Queue API",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aq-add",
+        "responseMode": "lastNode",
+        "options": {
+          "responseData": "allEntries"
+        }
+      },
+      "id": "wh-aq-add",
+      "name": "Webhook · aq-add",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        100
+      ],
+      "webhookId": "86d2b3fb455848cdb0cda071618cd689"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst b = $input.first().json.body || {};\nlet slaDeadline = null;\nif (b.sla) {\n  const m = String(b.sla).match(/^(\\d+)\\s*(second|minute|min|hour|day|week|month)/i);\n  if (m) {\n    const n = parseInt(m[1], 10);\n    const unit = m[2].toLowerCase();\n    const ms = unit.startsWith('sec') ? n*1000\n             : unit.startsWith('min') ? n*60000\n             : unit.startsWith('hour') ? n*3600000\n             : unit.startsWith('day') ? n*86400000\n             : unit.startsWith('week') ? n*7*86400000\n             : unit.startsWith('month') ? n*30*86400000\n             : 0;\n    if (ms > 0) slaDeadline = new Date(Date.now() + ms).toISOString();\n  }\n}\nreturn [{ json: { params: [\n  b.agent_name || 'unknown',\n  b.action_type || 'unknown',\n  JSON.stringify(b.payload || {}),\n  b.preview || '',\n  b.approval_required === false ? false : true,\n  slaDeadline,\n  b.why_now || ''\n] } }];\n"
+      },
+      "id": "code-51031158",
+      "name": "Prep ADD params",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        100
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nINSERT INTO ai.action_queue (\n  agent_name, action_type, payload, preview, status,\n  approval_required, sla_deadline, why_now\n) VALUES (\n  $1, $2, $3::jsonb, $4,\n  CASE WHEN $5::boolean THEN 'pending' ELSE 'auto' END,\n  $5::boolean,\n  $6::timestamptz,\n  $7\n)\nRETURNING id, status, created_at, sla_deadline;\n",
+        "options": {
+          "queryReplacement": "={{ $json.params }}"
+        }
+      },
+      "id": "pg-e1a9a301",
+      "name": "PG · Insert action",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        680,
+        100
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "LwmG3bwG5g2exyRt",
+          "name": "GG ai_agent (5433)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "aq-list",
+        "responseMode": "lastNode",
+        "options": {
+          "responseData": "allEntries"
+        }
+      },
+      "id": "wh-aq-list",
+      "name": "Webhook · aq-list",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        280
+      ],
+      "webhookId": "e8a99660b83f4791afa35e034e92ab6f"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst q = $input.first().json.query || {};\nreturn [{ json: { params: [\n  q.status || 'pending,auto',\n  parseInt(q.limit || '100', 10)\n] } }];\n"
+      },
+      "id": "code-9c5c3b5b",
+      "name": "Prep LIST params",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        280
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT json_agg(t ORDER BY created_at DESC) AS result FROM (\n  SELECT id, agent_name, action_type, preview, payload,\n         status, approval_required, sla_deadline, why_now,\n         ceo_comment, created_at, resolved_at,\n         (sla_deadline IS NOT NULL AND sla_deadline < NOW()) AS is_overdue\n  FROM ai.action_queue\n  WHERE status = ANY (string_to_array($1, ','))\n  ORDER BY\n    CASE WHEN sla_deadline IS NOT NULL AND sla_deadline < NOW() THEN 0 ELSE 1 END,\n    created_at DESC\n  LIMIT $2\n) t;\n",
+        "options": {
+          "queryReplacement": "={{ $json.params }}"
+        }
+      },
+      "id": "pg-3217e834",
+      "name": "PG · List queue",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        680,
+        280
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "LwmG3bwG5g2exyRt",
+          "name": "GG ai_agent (5433)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aq-decide",
+        "responseMode": "lastNode",
+        "options": {
+          "responseData": "allEntries"
+        }
+      },
+      "id": "wh-aq-decide",
+      "name": "Webhook · aq-decide",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        460
+      ],
+      "webhookId": "0f36a1e4fcb5413da239cc364fe0d216"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst b = $input.first().json.body || {};\nreturn [{ json: { params: [\n  parseInt(b.id, 10),\n  b.decision || 'approve',\n  b.comment || ''\n] } }];\n"
+      },
+      "id": "code-31ad8886",
+      "name": "Prep DECIDE params",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        460
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nUPDATE ai.action_queue\nSET status      = CASE WHEN $2 = 'approve' THEN 'approved'\n                       WHEN $2 = 'reject'  THEN 'rejected'\n                       ELSE status END,\n    ceo_comment = NULLIF($3, ''),\n    resolved_at = NOW()\nWHERE id = $1\nRETURNING id, status, resolved_at, ceo_comment;\n",
+        "options": {
+          "queryReplacement": "={{ $json.params }}"
+        }
+      },
+      "id": "pg-9955a54f",
+      "name": "PG · Decide",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        680,
+        460
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "LwmG3bwG5g2exyRt",
+          "name": "GG ai_agent (5433)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "aq-resolve",
+        "responseMode": "lastNode",
+        "options": {
+          "responseData": "allEntries"
+        }
+      },
+      "id": "wh-aq-resolve",
+      "name": "Webhook · aq-resolve",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        640
+      ],
+      "webhookId": "50faabd5019642eb92e1b4e04d2955f3"
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst b = $input.first().json.body || {};\nreturn [{ json: { params: [\n  parseInt(b.id, 10),\n  b.result || ''\n] } }];\n"
+      },
+      "id": "code-4fec668b",
+      "name": "Prep RESOLVE params",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        640
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nUPDATE ai.action_queue\nSET status      = 'done',\n    resolved_at = NOW(),\n    payload     = COALESCE(payload, '{}'::jsonb) || jsonb_build_object('result', $2)\nWHERE id = $1\nRETURNING id, status, resolved_at;\n",
+        "options": {
+          "queryReplacement": "={{ $json.params }}"
+        }
+      },
+      "id": "pg-9d260f7f",
+      "name": "PG · Resolve",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        680,
+        640
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "LwmG3bwG5g2exyRt",
+          "name": "GG ai_agent (5433)"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook · aq-add": {
+      "main": [
+        [
+          {
+            "node": "Prep ADD params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep ADD params": {
+      "main": [
+        [
+          {
+            "node": "PG · Insert action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook · aq-list": {
+      "main": [
+        [
+          {
+            "node": "Prep LIST params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep LIST params": {
+      "main": [
+        [
+          {
+            "node": "PG · List queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook · aq-decide": {
+      "main": [
+        [
+          {
+            "node": "Prep DECIDE params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep DECIDE params": {
+      "main": [
+        [
+          {
+            "node": "PG · Decide",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Webhook · aq-resolve": {
+      "main": [
+        [
+          {
+            "node": "Prep RESOLVE params",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prep RESOLVE params": {
+      "main": [
+        [
+          {
+            "node": "PG · Resolve",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  }
+}
