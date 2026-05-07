@@ -1,0 +1,198 @@
+{
+  "name": "WF-212 Cost Watcher",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "30 20 * * *"
+            }
+          ]
+        }
+      },
+      "id": "trigger-5d3fba91",
+      "name": "Cron 23:30 МСК",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT json_agg(t) AS result FROM (\n  SELECT\n    s.agent_name,\n    COALESCE(SUM(c.cost_usd) FILTER (WHERE c.log_date = CURRENT_DATE), 0)::numeric(10,4) AS spent_today,\n    (s.budget_usd_month / 30.0)::numeric(10,4) AS daily_norm,\n    COALESCE(SUM(c.cost_usd) FILTER (WHERE c.log_date >= CURRENT_DATE - INTERVAL '7 days'), 0)::numeric(10,4) AS spent_7d,\n    s.budget_usd_month\n  FROM ai.agent_settings s\n  LEFT JOIN ai.cost_log c ON c.agent_name = s.agent_name\n  WHERE s.is_active = TRUE\n  GROUP BY s.agent_name, s.budget_usd_month\n  ORDER BY spent_today DESC\n) t;\n",
+        "options": {}
+      },
+      "id": "pg-today",
+      "name": "PG · Daily spend",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "LwmG3bwG5g2exyRt",
+          "name": "GG ai_agent (5433)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst row = $input.first().json;\nconst agents = row.result || [];\nconst overruns = agents.filter(a => Number(a.spent_today) > 1.5 * Number(a.daily_norm) && Number(a.spent_today) > 0.5);\nconst total_today = agents.reduce((s,a) => s + Number(a.spent_today), 0);\nconst total_norm = agents.reduce((s,a) => s + Number(a.daily_norm), 0);\nconst rep = {\n  total_today: total_today.toFixed(2),\n  total_norm: total_norm.toFixed(2),\n  overrun_count: overruns.length,\n  overruns: overruns.map(a => ({\n    agent: a.agent_name,\n    spent: Number(a.spent_today).toFixed(2),\n    norm: Number(a.daily_norm).toFixed(2),\n    ratio: (Number(a.spent_today) / Math.max(0.01, Number(a.daily_norm))).toFixed(1)\n  })),\n  agents_count: agents.length,\n  agents_with_zero: agents.filter(a => Number(a.spent_7d) === 0).length,\n  needs_alert: overruns.length > 0 || total_today > total_norm * 1.5\n};\nreturn [{ json: rep }];\n"
+      },
+      "id": "code-assess",
+      "name": "Assess overruns",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nINSERT INTO ai.hourly_pulse (agent_name, pulse_at, status, summary, metrics)\nVALUES (\n  'cost_watcher',\n  NOW(),\n  CASE WHEN $1::boolean THEN 'degraded' ELSE 'idle' END,\n  $2,\n  $3::jsonb\n)\nRETURNING id, status;\n",
+        "options": {
+          "queryReplacement": "={{ [$json.needs_alert, 'Daily spend $' + $json.total_today + ' / norm $' + $json.total_norm + (Number($json.overrun_count) > 0 ? ', ' + $json.overrun_count + ' overruns' : ''), JSON.stringify($json)] }}"
+        }
+      },
+      "id": "pg-pulse",
+      "name": "PG · Pulse",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "LwmG3bwG5g2exyRt",
+          "name": "GG ai_agent (5433)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Assess overruns').item.json.needs_alert }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-alert",
+      "name": "IF needs alert?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "83436260",
+        "text": "={{ '💰 *Cost Watcher 23:30*\\n\\n' + 'Today: $' + $('Assess overruns').item.json.total_today + ' / norm $' + $('Assess overruns').item.json.total_norm + '\\n\\n' + ($('Assess overruns').item.json.overruns.length > 0 ? '⚠️ Overruns:\\n' + $('Assess overruns').item.json.overruns.map(o => '• ' + o.agent + ': $' + o.spent + ' (' + o.ratio + 'x norm)').join('\\n') : '') }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-alert",
+      "name": "Telegram · Alert CEO",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1340,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron 23:30 МСК": {
+      "main": [
+        [
+          {
+            "node": "PG · Daily spend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG · Daily spend": {
+      "main": [
+        [
+          {
+            "node": "Assess overruns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Assess overruns": {
+      "main": [
+        [
+          {
+            "node": "PG · Pulse",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG · Pulse": {
+      "main": [
+        [
+          {
+            "node": "IF needs alert?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF needs alert?": {
+      "main": [
+        [
+          {
+            "node": "Telegram · Alert CEO",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
