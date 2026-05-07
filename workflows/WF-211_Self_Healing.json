@@ -1,0 +1,217 @@
+{
+  "name": "WF-211 Self-Healing Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 4
+            }
+          ]
+        }
+      },
+      "id": "trigger-211",
+      "name": "Every 4h",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://n8n-4d54.onrender.com/api/v1/executions",
+        "authentication": "none",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "status",
+              "value": "error"
+            },
+            {
+              "name": "limit",
+              "value": "30"
+            },
+            {
+              "name": "includeData",
+              "value": "false"
+            }
+          ]
+        },
+        "options": {},
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-N8N-API-KEY",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1MGVlYWVhZi0xNjI4LTQwY2YtYjJhOC04OWE3ZGNmMmQ3NGUiLCJpc3MiOiJuOG4iLCJhdWQiOiJwdWJsaWMtYXBpIiwianRpIjoiYjAwNmIxMzMtYWUwNi00YjMzLWI0N2MtODBhZmUwY2NjM2VjIiwiaWF0IjoxNzc1NjI5MDYzLCJleHAiOjE3NzgxODc2MDB9.CmD0S_5c-wSyYGJWbCv_nI6f29eLa1m5k5rRZp7SHfM"
+            }
+          ]
+        }
+      },
+      "id": "http-failed",
+      "name": "HTTP · Failed executions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst resp = $input.first().json;\nconst items = resp.data || [];\nconst cutoff = Date.now() - 4*3600*1000; // last 4h\nconst recent = items.filter(e => new Date(e.startedAt).getTime() >= cutoff);\n\nconst classifyError = (msg) => {\n  if (!msg) return 'unknown';\n  const m = msg.toLowerCase();\n  if (m.includes('rate limit') || m.includes('429')) return 'rate_limit';\n  if (m.includes('token') && m.includes('expir')) return 'token_expired';\n  if (m.includes('timeout') || m.includes('etimedout')) return 'timeout';\n  if (m.includes('econnrefused') || m.includes('connection refused')) return 'pg_down';\n  if (m.includes('permission denied')) return 'pg_perms';\n  if (m.includes('invalid input syntax')) return 'sql_error';\n  if (m.includes('syntaxerror')) return 'js_syntax';\n  return 'other';\n};\n\nconst grouped = {};\nconst critical = [];\nfor (const e of recent) {\n  const wid = e.workflowId;\n  const wname = e.workflowName || wid;\n  const t = classifyError(e.stoppedAt ? '' : '');\n  if (!grouped[wname]) grouped[wname] = { count: 0, types: {} };\n  grouped[wname].count++;\n  grouped[wname].types[t] = (grouped[wname].types[t]||0) + 1;\n  if (t === 'unknown' || t === 'other') {\n    critical.push({wf: wname, exec: e.id, started: e.startedAt});\n  }\n}\n\nconst stat = {\n  total_recent_failures: recent.length,\n  workflows_affected: Object.keys(grouped).length,\n  by_workflow: grouped,\n  critical_count: critical.length,\n  critical_first_5: critical.slice(0, 5),\n  needs_cto_alert: critical.length >= 3 || recent.length >= 10,\n  status: recent.length === 0 ? 'idle' :\n          recent.length < 3   ? 'running' :\n          critical.length >= 3 ? 'degraded' : 'running'\n};\nreturn [{ json: stat }];\n"
+      },
+      "id": "code-classify",
+      "name": "Classify errors",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nINSERT INTO ai.hourly_pulse (agent_name, pulse_at, status, summary, metrics)\nVALUES (\n  'self_healing',\n  NOW(),\n  $1,\n  $2,\n  $3::jsonb\n)\nRETURNING id;\n",
+        "options": {
+          "queryReplacement": "={{ [$json.status, $json.total_recent_failures + ' failures in last 4h, ' + $json.workflows_affected + ' wfs affected, ' + $json.critical_count + ' critical', JSON.stringify($json)] }}"
+        }
+      },
+      "id": "pg-pulse-211",
+      "name": "PG · Pulse self_healing",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "LwmG3bwG5g2exyRt",
+          "name": "GG ai_agent (5433)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $('Classify errors').item.json.needs_cto_alert }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-211",
+      "name": "IF needs alert",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "83436260",
+        "text": "={{ '🩺 *Self-Healing 4h check*\\n\\n' + $('Classify errors').item.json.total_recent_failures + ' failures detected\\n' + $('Classify errors').item.json.workflows_affected + ' workflows affected\\n' + $('Classify errors').item.json.critical_count + ' need manual review\\n\\nFirst critical: ' + ($('Classify errors').item.json.critical_first_5.length ? $('Classify errors').item.json.critical_first_5[0].wf + ' (exec ' + $('Classify errors').item.json.critical_first_5[0].exec + ')' : 'none') }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-cto-211",
+      "name": "Telegram · CTO escalate",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1340,
+        300
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Every 4h": {
+      "main": [
+        [
+          {
+            "node": "HTTP · Failed executions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP · Failed executions": {
+      "main": [
+        [
+          {
+            "node": "Classify errors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Classify errors": {
+      "main": [
+        [
+          {
+            "node": "PG · Pulse self_healing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG · Pulse self_healing": {
+      "main": [
+        [
+          {
+            "node": "IF needs alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF needs alert": {
+      "main": [
+        [
+          {
+            "node": "Telegram · CTO escalate",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
