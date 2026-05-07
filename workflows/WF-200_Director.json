@@ -59,7 +59,8 @@
         "specifyBody": "json",
         "jsonBody": "={{ { model: 'claude-sonnet-4-5-20250929', max_tokens: 1200, system: $json.system_prompt, messages: [{role:'user', content: JSON.stringify($json.data)}] } }}",
         "options": {},
-        "genericAuthType": "httpHeaderAuth"
+        "genericAuthType": "httpHeaderAuth",
+        "method": "POST"
       },
       "id": "a-200",
       "name": "Anthropic Sonnet",
