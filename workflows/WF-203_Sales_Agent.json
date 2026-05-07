@@ -1,0 +1,217 @@
+{
+  "name": "WF-203 Sales Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 6 * * 1"
+            }
+          ]
+        }
+      },
+      "id": "trigger-203",
+      "name": "Cron Mon 09:00 МСК",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nSELECT json_build_object(\n  'whales_30d', (\n    SELECT json_agg(t) FROM (\n      SELECT user_id::text,\n             COUNT(*) AS orders,\n             ROUND(SUM(total_amount)::numeric/100.0, 2) AS gmv_eur,\n             MAX(created_at)::date::text AS last_order\n      FROM public.orders\n      WHERE status IN ('completed','paid','fulfilled','delivered')\n        AND created_at >= NOW() - INTERVAL '30 days'\n        AND user_id IS NOT NULL\n      GROUP BY user_id\n      HAVING SUM(total_amount) >= 50000  -- ≥€500\n      ORDER BY gmv_eur DESC LIMIT 10\n    ) t\n  ),\n  'ym_whales_30d', (\n    SELECT json_agg(t) FROM (\n      SELECT\n        COALESCE(buyer_info->>'lastName','?') || ' ' || COALESCE(buyer_info->>'firstName','') AS name,\n        COUNT(*) AS orders,\n        ROUND(SUM(items_total)::numeric/100.0, 0) AS rub\n      FROM public.yandex_market_orders\n      WHERE created_at >= NOW() - INTERVAL '30 days'\n        AND status IN ('delivered','DELIVERED')\n      GROUP BY 1\n      HAVING SUM(items_total) >= 30000 * 100\n      ORDER BY rub DESC LIMIT 10\n    ) t\n  ),\n  'partner_api_growth', (\n    SELECT json_agg(t) FROM (\n      SELECT user_id::text,\n             COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') AS orders_30d,\n             COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '60 days' AND created_at < NOW() - INTERVAL '30 days') AS orders_30_60d,\n             ROUND(SUM(total_amount) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::numeric/100.0, 2) AS gmv_30d\n      FROM public.orders\n      WHERE channel = 'partner' AND user_id IS NOT NULL\n        AND created_at >= NOW() - INTERVAL '60 days'\n      GROUP BY user_id\n      HAVING COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days') > 0\n      ORDER BY gmv_30d DESC LIMIT 5\n    ) t\n  ),\n  'b2b_signed_count', 0,  -- to be filled later when we have a contracts table\n  'recent_silent_whales', (\n    SELECT json_agg(t) FROM (\n      SELECT user_id::text,\n             ROUND(SUM(total_amount)::numeric/100.0, 2) AS lifetime_gmv,\n             MAX(created_at)::date::text AS last_order,\n             EXTRACT(day FROM NOW() - MAX(created_at))::int AS silent_days\n      FROM public.orders\n      WHERE status IN ('completed','paid','fulfilled','delivered')\n        AND user_id IS NOT NULL\n      GROUP BY user_id\n      HAVING SUM(total_amount) >= 100000  -- ≥€1K lifetime\n        AND EXTRACT(day FROM NOW() - MAX(created_at)) BETWEEN 14 AND 60\n      ORDER BY lifetime_gmv DESC LIMIT 5\n    ) t\n  )\n) AS result;\n",
+        "options": {}
+      },
+      "id": "pg-pipe-203",
+      "name": "PG · B2B pipeline data",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        460,
+        300
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "LwmG3bwG5g2exyRt",
+          "name": "GG ai_agent (5433)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst data = $input.first().json.result || {};\n\nconst prompt = `You are the SVP of Sales at Gaming Goods, a digital goods marketplace for the Russian-speaking market.\nToday is Monday — generate the weekly B2B sales digest in Russian for the CEO Кирилл.\n\nAvailable context (last 30 days):\n\nWEB WHALES (top users by GMV):\n${JSON.stringify(data.whales_30d || [], null, 2)}\n\nYANDEX MARKET WHALES:\n${JSON.stringify(data.ym_whales_30d || [], null, 2)}\n\nPARTNER API GROWTH (B2B already through partner channel):\n${JSON.stringify(data.partner_api_growth || [], null, 2)}\n\nWHALES SILENT 14-60 DAYS (potential B2B-recovery targets):\n${JSON.stringify(data.recent_silent_whales || [], null, 2)}\n\nTeam: CEO Кирилл (strategic deals), Радченко (sales closing), Дмитриев (corporate intros to МТС, Озон, Wildberries), Sasha (CTO, infra).\n\nTasks:\n1. Identify top-3 B2B opportunities for THIS WEEK (existing whale → contract, new partner intro, recovery of silent whale).\n2. For each: who owns it (Кир/Радченко/Дмитриев), what concrete action this week, expected outcome.\n3. Note any red flags (whale silent that wasn't yesterday, partner growth slowdown).\n4. Suggest one bold experiment for May.\n\nReturn JSON:\n{\n  \"summary\": \"1-2 sentences for Telegram\",\n  \"top_3_actions\": [\n    {\"who\": \"Кир|Радченко|Дмитриев\", \"action\": \"...\", \"outcome\": \"...\", \"deadline\": \"Friday\"}\n  ],\n  \"red_flags\": [\"...\"],\n  \"experiment\": \"...\",\n  \"telegram_text\": \"≤400 char Markdown for CEO Telegram\"\n}\n`;\nreturn [{ json: { prompt, raw_data: data } }];\n"
+      },
+      "id": "code-prompt-203",
+      "name": "Build prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "anthropicApi",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ { model: 'claude-sonnet-4-5-20250929', max_tokens: 1500, messages: [{role:'user', content: $json.prompt}] } }}",
+        "options": {}
+      },
+      "id": "anth-203",
+      "name": "Anthropic · Weekly digest",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        900,
+        300
+      ],
+      "credentials": {
+        "anthropicApi": {
+          "id": "xZPzwI0sOTN0iSp8",
+          "name": "Anthropic API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nconst resp = $input.first().json;\nconst text = (resp.content && resp.content[0] && resp.content[0].text) || '';\nlet parsed;\ntry {\n  // strip markdown code fences if present\n  const cleaned = text.replace(/^```json\\s*/i,'').replace(/```\\s*$/,'').trim();\n  parsed = JSON.parse(cleaned);\n} catch(e) {\n  parsed = { summary: 'Parse error', telegram_text: text.slice(0, 400), top_3_actions: [], red_flags: [], experiment: '' };\n}\nreturn [{ json: parsed }];\n"
+      },
+      "id": "code-parse-203",
+      "name": "Parse digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "\nINSERT INTO ai.hourly_pulse (agent_name, pulse_at, status, summary, metrics)\nVALUES ('sales', NOW(), 'idle', $1, $2::jsonb)\nRETURNING id;\n",
+        "options": {
+          "queryReplacement": "={{ [$json.summary || 'weekly digest sent', JSON.stringify($json)] }}"
+        }
+      },
+      "id": "pg-pulse-203",
+      "name": "PG · Pulse sales",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [
+        1340,
+        200
+      ],
+      "credentials": {
+        "postgres": {
+          "id": "LwmG3bwG5g2exyRt",
+          "name": "GG ai_agent (5433)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "83436260",
+        "text": "={{ '💼 *Sales · Понедельник*\\n\\n' + $('Parse digest').item.json.telegram_text }}",
+        "additionalFields": {
+          "parse_mode": "Markdown"
+        }
+      },
+      "id": "tg-203",
+      "name": "Telegram · Weekly digest",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1340,
+        400
+      ],
+      "credentials": {
+        "telegramApi": {
+          "id": "IjoBfA5jgnMrU9qV",
+          "name": "GG Telegram Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Cron Mon 09:00 МСК": {
+      "main": [
+        [
+          {
+            "node": "PG · B2B pipeline data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "PG · B2B pipeline data": {
+      "main": [
+        [
+          {
+            "node": "Build prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build prompt": {
+      "main": [
+        [
+          {
+            "node": "Anthropic · Weekly digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic · Weekly digest": {
+      "main": [
+        [
+          {
+            "node": "Parse digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse digest": {
+      "main": [
+        [
+          {
+            "node": "PG · Pulse sales",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Telegram · Weekly digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
