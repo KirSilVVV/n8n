@@ -1,3 +1,14 @@
+# 🟢 STATUS UPDATE 08.05.2026 — APPLIED
+
+- ✅ GG-91 closed: GRANT SELECT/INSERT/UPDATE/DELETE on seo_landings выдан n8n_reader
+- ✅ Opus 4.7 SEO применён в seo_landings (title 63, article 6613, FAQ 12)
+- ✅ SSR проверен: новые title/desc/h1 отдаются на https://gaming-goods.ru/t/cs-skins-marketplace
+- ✅ Yandex IndexNow: pinged (HTTP 202)
+- ✅ Yandex Webmaster Recrawl: task `5b7cfa50-4ad6-11f1-8f57-97098f3b7f43`
+- 📅 Next check: 11–14.05.2026 — первые показы по «купить скины cs2», «кейсы cs2 за рубли»
+
+---
+
 # 🎯 CS Skins Hub — полная SEO-стратегия для топ-3 в Яндексе
 
 **URL:** https://gaming-goods.ru/t/cs-skins-marketplace  
